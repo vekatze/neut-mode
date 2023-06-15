@@ -172,7 +172,7 @@
   (setq font-lock-defaults
         `(,`((,(regexp-opt '("tau" "flow") 'symbols)
               . font-lock-type-face)
-             (,(regexp-opt '("alias" "alias-opaque" "attach" "borrow" "by" "case" "data" "default" "define" "define-inline" "detach" "else" "else-if" "export" "fix" "if" "import" "inline" "introspect" "lambda" "let" "let?" "let-mu" "let&" "link" "match" "mu" "mutate" "of" "on" "resource" "struct" "then" "when" "with" "call") 'symbols)
+             (,(regexp-opt '("alias" "alias-opaque" "attach" "borrow" "by" "case" "data" "declare" "default" "define" "detach" "else" "else-if" "export" "external" "fix" "if" "import" "inline" "introspect" "lambda" "let" "let?" "let-mu" "let&" "link" "match" "mu" "mutate" "of" "on" "resource" "struct" "then" "when" "with" "call") 'symbols)
               . font-lock-keyword-face)
              (,(regexp-opt '("-" "->" "++" ":" "_" "<-" "<=" ":=" "=" "=>" "hole" "magic" "target-arch" "target-os" "target-platform" "tuple" "assert") 'symbols)
               . font-lock-builtin-face)

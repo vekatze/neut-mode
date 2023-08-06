@@ -157,10 +157,13 @@
      (modify-syntax-entry ?/ "_ 12" syntax-table)
      (modify-syntax-entry ?- "w" syntax-table)
      (modify-syntax-entry ?_ "w" syntax-table)
-     (modify-syntax-entry ?. "w" syntax-table)
+     ;; (modify-syntax-entry ?. "w" syntax-table)
+     ;; (modify-syntax-entry ?. "_" syntax-table)
+     (modify-syntax-entry ?. "." syntax-table)
      (modify-syntax-entry ?< "_" syntax-table)
      (modify-syntax-entry ?> "_" syntax-table)
-     (modify-syntax-entry ?: "_" syntax-table)
+     ;; (modify-syntax-entry ?: "_" syntax-table)
+     (modify-syntax-entry ?: "." syntax-table)
      (modify-syntax-entry ?+ "_" syntax-table)
      (modify-syntax-entry ?* "_" syntax-table)
      (modify-syntax-entry ?\n ">" syntax-table)
@@ -172,7 +175,7 @@
   (setq font-lock-defaults
         `(,`((,(regexp-opt '("tau" "flow") 'symbols)
               . font-lock-type-face)
-             (,(regexp-opt '("alias" "alias-opaque" "attach" "borrow" "by" "case" "data" "declare" "default" "define" "detach" "else" "else-if" "export" "external" "fix" "if" "import" "inline" "introspect" "lambda" "let" "let?" "let-mu" "let&" "link" "match" "mu" "mutate" "of" "on" "resource" "struct" "then" "when" "with" "call") 'symbols)
+             (,(regexp-opt '("alias" "alias-opaque" "attach" "begin" "borrow" "by" "case" "data" "declare" "def" "default" "define" "detach" "do" "else" "else-if" "export" "external" "fix" "fn" "if" "import" "in" "inline" "introspect" "lambda" "let" "let?" "let-mu" "let&" "link" "lucent" "macro" "match" "mu" "mutate" "of" "on" "resource" "struct" "then" "via" "when" "with" "call") 'symbols)
               . font-lock-keyword-face)
              (,(regexp-opt '("-" "->" "++" ":" "_" "<-" "<=" ":=" "=" "=>" "hole" "magic" "target-arch" "target-os" "target-platform" "tuple" "assert") 'symbols)
               . font-lock-builtin-face)
@@ -182,18 +185,38 @@
               . font-lock-warning-face)
              (,(regexp-opt '("this" "base") 'symbols)
               . font-lock-constant-face)
+             ("\\<\[A-Z\]\[-A-Za-z0-9\]\*\\>"
+              . font-lock-type-face)
              ("define +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
              ("inline +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
+              . (1 font-lock-function-name-face))
+             ("lucent +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
              ("data +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
               . (1 font-lock-function-name-face))
              ("alias +\\([^[:space:]\s\s)]+?\\)[ \n\s(\s)]"
               . (1 font-lock-function-name-face))
-             ("struct +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
+             ("macro +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
-             ("\\<\[A-Z\]\[-A-Za-z0-9\]\*\\>"
-              . font-lock-type-face)
+             ("[^[:space:]\s({<\s)}>]+!"
+              . font-lock-keyword-face)
+             ("\\(:[^ \n]+\\)"
+              . (1 font-lock-function-name-face))
+             ("\\(\\[[0-9]+\\]\\)"
+              . (1 font-lock-comment-face))
+             ("\\({[0-9]+}\\)"
+              . (1 font-lock-comment-face))
+             ("\\(/[0-9]+\\)"
+              . (1 font-lock-comment-face))
+             ("\\(|[0-9]+\\)"
+              . (1 font-lock-comment-face))
+             ("\\(_[0-9]+\\)"
+              . (1 font-lock-comment-face))
+             ("\\(#[0-9]+\\)"
+              . (1 font-lock-comment-face))
+             ("\\(\\?[0-9]+\\)"
+              . (1 font-lock-comment-face))
              ("*"
               . font-lock-builtin-face)
              ("?"

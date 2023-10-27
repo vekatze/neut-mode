@@ -8,171 +8,246 @@
 
 ;;; Code:
 
+;;
+;; indentation
+;;
+
+;; the indentation of current line can be calculated as follows:
+;;
+;;   (*1) find the shallowest part(s) of current line and go there
+;;   (*2) backtrack and find the nearest encloser
+;;   (*3) (current line's indentation) = (the indentation of the nearest encloser) + offset
+;;
+;; tips:
+;;
+;;   1. the indentation of the root encloser should be regarded as (-1) * base-offset
+;;   2. `let .. in' is also a parenthesis pair, just like `(..)'
+
+
 (defvar neut-mode-indent-offset 2)
 
-(defconst neut-mode--opening-parens '(?\( ?\{ ?\[))
-(defconst neut-mode--closing-parens '(?\) ?\} ?\]))
+(defun neut--get-offset-from-eol ()
+  (- (line-end-position) (point)))
 
 (defun neut-mode-indent-line ()
   (interactive)
-  (let ((original-offset-from-eol (neut-mode--get-offset-from-eol)))
-    (indent-line-to (neut-mode--calculate-indentation))
-    (when (< original-offset-from-eol (neut-mode--get-offset-from-eol))
+  (let ((original-offset-from-eol (neut--get-offset-from-eol)))
+    (indent-line-to (neut--calculate-indentation))
+    (when (< original-offset-from-eol (neut--get-offset-from-eol))
       (goto-char (- (line-end-position) original-offset-from-eol)))))
 
-(defun neut-mode--get-offset-from-eol ()
-  (- (line-end-position) (point)))
+(defun neut--calculate-indentation ()
+  (if (or (neut--in-string-p (point))
+          (neut--in-string-p (line-beginning-position)))
+      (neut--get-indentation-of (point)) ;; leave strings as they are
+    (let* ((bullet-offset (neut--get-bullet-offset))
+           (child-line-number (line-number-at-pos (point)))
+           (child-indentation (neut--get-indentation-of child-line-number))
+           (parent-pos-or-none (save-excursion
+                                 (neut--goto-indent-base-position) ;; (*1)
+                                 (neut--get-parent 0))) ;; (*2)
+           (parent-indentation (neut--get-indentation-of parent-pos-or-none)))
+      (+ parent-indentation neut-mode-indent-offset bullet-offset)))) ;; (*3)
 
-(defun neut-mode--calculate-indentation ()
-  (save-excursion
-    (if (not (= (forward-line -1) 0))
-        0
-      (let ((current-indent (neut-mode--get-current-indentation)))
-        (let* ((parent-indent (neut-mode--get-parent-indentation))
-               (positive-offset (neut-mode--get-positive-offset-of-next-line))
-               (negative-offset (neut-mode--get-negative-offset-of-next-line))
-               (adjuster (if (> positive-offset 0) (- current-indent parent-indent) 0)))
-          (+ parent-indent positive-offset negative-offset adjuster))))))
+(defun neut--get-indentation-of (pos)
+  (if pos
+      (save-excursion
+        (neut--goto-line (line-number-at-pos pos))
+        (neut--get-first-char-column))
+    (* -1 neut-mode-indent-offset)))
 
-(defun neut-mode--back-until-nonempty ()
-  (when (neut-mode--line-empty-p)
-    (forward-line -1)
-    (neut-mode--back-until-nonempty)))
+(defun neut--goto-indent-base-position ()
+  (goto-char (line-end-position))
+  (goto-char (neut--find-shallowest-point 0 0 (point))))
 
-(defun neut-mode--get-current-indentation ()
-  (save-excursion
-    (neut-mode--back-until-nonempty)
-    (neut-mode--get-first-char-column)))
+(defun neut--goto-line (line-number)
+  (goto-char (point-min))
+  (forward-line (- line-number 1)))
 
-(defun neut-mode--get-parent-indentation ()
-  (save-excursion
-    (neut-mode--back-until-nonempty)
-    (goto-char (line-end-position))
-    (neut-mode--go-to-parent-line)
-    (neut-mode--get-first-char-column)))
+(defun neut--goto-first-char-column ()
+  (goto-char (line-beginning-position))
+  (skip-chars-forward " ")
+  (current-column))
 
-(defun neut-mode--get-first-char-column ()
+(defun neut--get-first-char-column ()
+  (save-excursion (neut--goto-first-char-column)))
+
+(defun neut--in-string-p (pos)
+  (nth 3 (syntax-ppss pos)))
+
+(defun neut--skip-comment (start)
+  (interactive)
+  (when (re-search-backward "//" (line-beginning-position) t)
+    (let ((pos (match-beginning 0)))
+      (if (neut--in-string-p pos)
+          (goto-char start)
+        (neut--skip-comment pos)))))
+
+(defun neut--find-shallowest-point (eval-value max-eval-value shallowest-pos)
+  "Backtrack from the end of a line and find (one of) the shallowest point of the line.
+
+The shallowness of a point is evaluated by `eval-value'; This value is incremented when
+an open paren is found, and decremented when a closing paren is found."
+  (let ((char (preceding-char)))
+    (cond
+     ((= char 0)
+      shallowest-pos)
+     ((= char ?\n)
+      shallowest-pos)
+     ((= char ? )
+      (goto-char (- (point) 1))
+      (neut--find-shallowest-point eval-value max-eval-value shallowest-pos))
+     ;; found an opening paren
+     ((neut--opening-paren-p char)
+      (goto-char (- (point) 1))
+      (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
+     ;; found a closing paren
+     ((neut--closing-paren-p char)
+      (goto-char (- (point) 1))
+      (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+     (t
+      (let ((token (neut--get-token (point))))
+        (cond
+         ((neut--let-symbol-p token)
+          ;; (essentially) found a opening paren
+          (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
+         ;; (essentially) found a closing paren
+          ((string= token "in")
+           (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+         ((string= token "")
+          shallowest-pos)
+         (t
+          (neut--find-shallowest-point eval-value max-eval-value shallowest-pos))))))))
+
+(defun neut--backtrack-opening-paren (eval-value max-eval-value shallowest-pos)
+  (let ((next-eval-value (+ eval-value 1)))
+    (if (> next-eval-value max-eval-value)
+        (neut--find-shallowest-point next-eval-value next-eval-value (point))
+      (neut--find-shallowest-point next-eval-value max-eval-value shallowest-pos))))
+
+(defun neut--backtrack-closing-paren (eval-value max-eval-value shallowest-pos)
+  (neut--find-shallowest-point (- eval-value 1) max-eval-value shallowest-pos))
+
+(defun neut--get-bullet-offset ()
   (save-excursion
     (goto-char (line-beginning-position))
-    (skip-chars-forward " -")
-    (current-column)))
+    (skip-chars-forward " ")
+    (if (re-search-forward "- " (+ (point) 2) t)
+        (* -1 neut-mode-indent-offset)
+      0)))
 
-(defun neut-mode--get-positive-offset-of-next-line ()
+(defun neut--get-parent (let-level)
+  "Find the nearest encloser of current point by backtracking. Returns nil if the encloser is the file itself.
+
+The `let-level' is just to handle nested (let .. in).
+This function must be called from outside a string."
+  (let ((char (preceding-char)))
+    (cond
+     ((= char 0)
+      nil)
+     ((neut--skip-p char)
+      (goto-char (- (point) 1))
+      (neut--get-parent let-level))
+     ((neut--newline-p char)
+      (goto-char (- (point) 1))
+      (neut--skip-comment (point))
+      (neut--get-parent let-level))
+     ((neut--opening-paren-p char)
+      (point))
+     ((neut--closing-paren-p char)
+      (goto-char (scan-sexps (point) -1)) ;; skip a paren-pair
+      (neut--get-parent let-level))
+     ((neut--double-quote-p char)
+      (goto-char (scan-sexps (point) -1)) ;; skip a string
+      (neut--get-parent let-level))
+     (t
+      (let ((token (neut--get-token (point))))
+        (cond
+         ((neut--let-symbol-p token)
+          (cond
+           ((eq let-level 0)
+            (point))
+           (t
+            (neut--get-parent (- let-level 1)))) ;; found the end of a nested let
+          )
+         ((string= token "in")
+          (neut--get-parent (+ let-level 1))) ;; found the beginning of a nested let
+         (t
+          (neut--get-parent let-level))))))))
+
+(defun neut--get-token (initial-position)
+  (let ((char (preceding-char)))
+    (cond
+     ((eq (point) (line-beginning-position))
+      (buffer-substring-no-properties (point) initial-position))
+     ((neut--non-token-p char)
+      (buffer-substring-no-properties (point) initial-position))
+     (t
+      (goto-char (- (point) 1))
+      (neut--get-token initial-position)))))
+
+(defun neut--make-hash-table (chars)
+  (let ((table (make-hash-table :test 'equal)))
+    (dolist (char chars)
+      (puthash char t table))
+    table))
+
+(defconst neut--opening-paren-char-set
+  (neut--make-hash-table (list ?{ ?\( ?\[)))
+(defconst neut--closing-paren-char-set
+  (neut--make-hash-table (list ?} ?\) ?\])))
+(defconst neut--skip-char-set
+  (neut--make-hash-table (list ?\s ?, ?: ?\; ?&)))
+(defconst neut--newline-char-set
+  (neut--make-hash-table (list ?\n)))
+(defconst neut--double-quote-char-set
+  (neut--make-hash-table (list ?\")))
+(defconst neut--non-token-char-set
+  (neut--make-hash-table (list ?{ ?} ?\( ?\) ?\[ ?\] ?\s ?\n ?\;)))
+(defconst neut--let-symbol-set
+  (neut--make-hash-table (list "let" "tie" "try" "bind")))
+(defun neut--opening-paren-p (char)
+  (gethash char neut--opening-paren-char-set))
+(defun neut--closing-paren-p (char)
+  (gethash char neut--closing-paren-char-set))
+(defun neut--skip-p (char)
+  (gethash char neut--skip-char-set))
+(defun neut--newline-p (char)
+  (gethash char neut--newline-char-set))
+(defun neut--double-quote-p (char)
+  (gethash char neut--double-quote-char-set))
+(defun neut--non-token-p (char)
+  (gethash char neut--non-token-char-set))
+(defun neut--let-symbol-p (char)
+  (gethash char neut--let-symbol-set))
+
+(defun neut--electric-indent-p (char)
   (save-excursion
-    (neut-mode--back-until-nonempty)
-    (let* ((begins-with-hyphen (neut-mode--line-begins-with-hyphen-p))
-           (ends-with-equal (neut-mode--line-ends-with-equal-p))
-           (ends-with-open-paren (neut-mode--line-ends-with-opening-paren-p))
-           (cond-list
-            (list
-             ends-with-open-paren
-             (and ends-with-equal (not begins-with-hyphen)))))
-      (apply '+ (mapcar (lambda (b) (if b neut-mode-indent-offset 0)) cond-list)))))
+    (skip-chars-backward "[:alpha:]:_?!")
+    (looking-at (regexp-opt '("in")))))
 
-(defun neut-mode--get-negative-offset-of-next-line ()
-  (save-excursion
-    (if (not (= (forward-line 1) 0))
-        0
-      (let* ((begins-with-hyphen (neut-mode--line-begins-with-hyphen-p))
-             (begins-with-closing-paren (neut-mode--line-begins-with-closing-paren-p))
-             (cond-list
-              (list
-               begins-with-hyphen
-               begins-with-closing-paren)))
-        (apply '+ (mapcar (lambda (b) (if b (* -1 neut-mode-indent-offset) 0)) cond-list))))))
+;;
+;; utils
+;;
 
-(defun neut-mode--go-to-parent-line ()
-  (interactive)
-  (cond
-   ((neut-mode--line-empty-p)
-    (forward-line -1)
-    (neut-mode--go-to-parent-line))
-   ((member (char-before) neut-mode--closing-parens)
-    (backward-sexp)
-    (neut-mode--go-to-parent-line))
-   ((string= (neut-mode--get-preceding-symbol) "in")
-    (message "found in")
-    (neut-mode--jump-back-to-let)
-    (neut-mode--go-to-parent-line)
-    )
-   ((not (= (point) (line-beginning-position)))
-    (backward-char)
-    (neut-mode--go-to-parent-line))
-   ((neut-mode--should-go-up-p)
-    (backward-char)
-    (neut-mode--go-to-parent-line))))
-
-(defun neut-mode--get-preceding-symbol ()
-  (save-excursion
-    (backward-word)
-    (thing-at-point 'symbol)))
-
-(defun neut-mode--jump-back-to-let ()
-  "Jump to the corresponding `let' from `in'."
-  (cond
-   ((string= (thing-at-point 'symbol) "let")
-    nil)
-   ((string= (thing-at-point 'symbol) "in")
-    (backward-word)
-    (neut-mode--jump-back-to-let) ;; skip inner let-in
-    (backward-word)
-    (neut-mode--jump-back-to-let))
-   (t
-    (when (backward-word)
-      (neut-mode--jump-back-to-let)))))
-
-(defun neut-mode--should-go-up-p ()
-  (let ((base-indentation (current-indentation)))
-    (save-excursion
-      (when (= (forward-line -1) 0)
-        (neut-mode--back-until-nonempty)
-        (let ((previous-indentation (current-indentation)))
-          (and
-           (< previous-indentation base-indentation)
-           (not (neut-mode--line-ends-with-equal-p))
-           (not (neut-mode--line-ends-with-opening-paren-p))
-           (not (neut-mode--line-ends-with-in-p))))))))
-
-(defun neut-mode--line-empty-p ()
+(defun neut--line-empty-p ()
   (string-match-p "\\`\\s-*$" (thing-at-point 'line)))
 
-(defun neut-mode--line-begins-with-closing-paren-p ()
-  (save-excursion
-    (skip-chars-forward " ")
-    (member (char-after) neut-mode--closing-parens)))
-
-(defun neut-mode--line-begins-with-hyphen-p ()
-  (save-excursion
-    (goto-char (line-beginning-position))
-    (skip-chars-forward " ")
-    (eq (char-after) ?-)))
-
-(defun neut-mode--line-ends-with-opening-paren-p ()
-  (save-excursion
-    (goto-char (line-end-position))
-    (skip-chars-backward " ")
-    (member (char-before) neut-mode--opening-parens)))
-
-(defun neut-mode--line-ends-with-equal-p ()
-  (save-excursion
-    (goto-char (line-end-position))
-    (skip-chars-backward " ")
-    (eq (char-before) ?=)))
-
-(defun neut-mode--line-ends-with-in-p ()
-  (string-match-p "\sin$" (thing-at-point 'line)))
-
-(defun neut-mode--insert-bullet ()
+(defun neut--insert-bullet ()
   (interactive)
   (cond
    ((= (point) (line-beginning-position))
     (insert "- ")
     )
-   ((not (neut-mode--line-empty-p))
+   ((not (neut--line-empty-p))
     (insert "-"))
    (t
     (insert "- ")
     (indent-according-to-mode))))
+
+;;
+;; defining major mode
+;;
 
 ;;;###autoload
 (define-derived-mode neut-mode prog-mode "neut"
@@ -185,7 +260,6 @@
    (let ((syntax-table (make-syntax-table)))
      (modify-syntax-entry ?/ "_ 12" syntax-table)
      (modify-syntax-entry ?\n ">" syntax-table)
-
      (modify-syntax-entry ?- "_" syntax-table)
      (modify-syntax-entry ?_ "w" syntax-table)
      (modify-syntax-entry ?. "." syntax-table)
@@ -196,9 +270,9 @@
      (modify-syntax-entry ?* "_" syntax-table)
      (modify-syntax-entry ?? "w" syntax-table)
      syntax-table))
-  ;; (setq-local indent-line-function 'neut-mode-indent-line)
-
-  (define-key neut-mode-map "-" #'neut-mode--insert-bullet)
+  (setq-local indent-line-function 'neut-mode-indent-line)
+  (add-hook 'electric-indent-functions #'neut--electric-indent-p nil 'local)
+  (define-key neut-mode-map "-" #'neut--insert-bullet)
   (setq font-lock-defaults
         `(,`((,(regexp-opt '("tau" "flow") 'symbols)
               . font-lock-type-face)

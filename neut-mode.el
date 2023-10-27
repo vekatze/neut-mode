@@ -90,12 +90,36 @@
    ((member (char-before) neut-mode--closing-parens)
     (backward-sexp)
     (neut-mode--go-to-parent-line))
+   ((string= (neut-mode--get-preceding-symbol) "in")
+    (message "found in")
+    (neut-mode--jump-back-to-let)
+    (neut-mode--go-to-parent-line)
+    )
    ((not (= (point) (line-beginning-position)))
     (backward-char)
     (neut-mode--go-to-parent-line))
    ((neut-mode--should-go-up-p)
     (backward-char)
     (neut-mode--go-to-parent-line))))
+
+(defun neut-mode--get-preceding-symbol ()
+  (save-excursion
+    (backward-word)
+    (thing-at-point 'symbol)))
+
+(defun neut-mode--jump-back-to-let ()
+  "Jump to the corresponding `let' from `in'."
+  (cond
+   ((string= (thing-at-point 'symbol) "let")
+    nil)
+   ((string= (thing-at-point 'symbol) "in")
+    (backward-word)
+    (neut-mode--jump-back-to-let) ;; skip inner let-in
+    (backward-word)
+    (neut-mode--jump-back-to-let))
+   (t
+    (when (backward-word)
+      (neut-mode--jump-back-to-let)))))
 
 (defun neut-mode--should-go-up-p ()
   (let ((base-indentation (current-indentation)))
@@ -105,7 +129,9 @@
         (let ((previous-indentation (current-indentation)))
           (and
            (< previous-indentation base-indentation)
-           (not (neut-mode--line-ends-with-opening-paren-p))))))))
+           (not (neut-mode--line-ends-with-equal-p))
+           (not (neut-mode--line-ends-with-opening-paren-p))
+           (not (neut-mode--line-ends-with-in-p))))))))
 
 (defun neut-mode--line-empty-p ()
   (string-match-p "\\`\\s-*$" (thing-at-point 'line)))
@@ -133,6 +159,9 @@
     (skip-chars-backward " ")
     (eq (char-before) ?=)))
 
+(defun neut-mode--line-ends-with-in-p ()
+  (string-match-p "\sin$" (thing-at-point 'line)))
+
 (defun neut-mode--insert-bullet ()
   (interactive)
   (cond
@@ -155,29 +184,27 @@
   (set-syntax-table
    (let ((syntax-table (make-syntax-table)))
      (modify-syntax-entry ?/ "_ 12" syntax-table)
-     (modify-syntax-entry ?- "w" syntax-table)
+     (modify-syntax-entry ?\n ">" syntax-table)
+
+     (modify-syntax-entry ?- "_" syntax-table)
      (modify-syntax-entry ?_ "w" syntax-table)
-     ;; (modify-syntax-entry ?. "w" syntax-table)
-     ;; (modify-syntax-entry ?. "_" syntax-table)
      (modify-syntax-entry ?. "." syntax-table)
      (modify-syntax-entry ?< "_" syntax-table)
      (modify-syntax-entry ?> "_" syntax-table)
-     ;; (modify-syntax-entry ?: "_" syntax-table)
      (modify-syntax-entry ?: "." syntax-table)
      (modify-syntax-entry ?+ "_" syntax-table)
      (modify-syntax-entry ?* "_" syntax-table)
-     (modify-syntax-entry ?\n ">" syntax-table)
      (modify-syntax-entry ?? "w" syntax-table)
      syntax-table))
-  (setq-local indent-line-function 'neut-mode-indent-line)
+  ;; (setq-local indent-line-function 'neut-mode-indent-line)
 
   (define-key neut-mode-map "-" #'neut-mode--insert-bullet)
   (setq font-lock-defaults
         `(,`((,(regexp-opt '("tau" "flow") 'symbols)
               . font-lock-type-face)
-             (,(regexp-opt '("alias" "alias-opaque" "attach" "begin" "borrow" "by" "case" "data" "declare" "def" "default" "define" "detach" "do" "else" "else-if" "export" "external" "fix" "fn" "if" "import" "in" "inline" "introspect" "lambda" "let" "let?" "let-mu" "let&" "link" "lucent" "macro" "match" "mu" "mutate" "of" "on" "resource" "struct" "then" "via" "when" "with" "call") 'symbols)
+             (,(regexp-opt '("attach" "bind" "case" "data" "declare" "default" "define" "detach" "do" "else" "else-if" "external" "if" "import" "in" "inline" "introspect" "let" "match" "mu" "of" "on" "resource" "then" "tie" "try" "type" "when" "with") 'symbols)
               . font-lock-keyword-face)
-             (,(regexp-opt '("-" "->" "++" ":" "_" "<-" "<=" ":=" "=" "=>" "hole" "magic" "target-arch" "target-os" "target-platform" "tuple" "assert") 'symbols)
+             (,(regexp-opt '("-" "->" ":" "=" "=>" "_" "assert" "magic" "target-arch" "target-os" "target-platform" "tuple") 'symbols)
               . font-lock-builtin-face)
              (,(regexp-opt '("::") 'symbols)
               . font-lock-type-face)
@@ -191,32 +218,10 @@
               . (1 font-lock-function-name-face))
              ("inline +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
-             ("lucent +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
              ("data +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
               . (1 font-lock-function-name-face))
-             ("alias +\\([^[:space:]\s\s)]+?\\)[ \n\s(\s)]"
+             ("type +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
               . (1 font-lock-function-name-face))
-             ("macro +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("[^[:space:]\s({<\s)}>]+!"
-              . font-lock-keyword-face)
-             ("\\(:[^ \n]+\\)"
-              . (1 font-lock-function-name-face))
-             ("\\(\\[[0-9]+\\]\\)"
-              . (1 font-lock-comment-face))
-             ("\\({[0-9]+}\\)"
-              . (1 font-lock-comment-face))
-             ("\\(/[0-9]+\\)"
-              . (1 font-lock-comment-face))
-             ("\\(|[0-9]+\\)"
-              . (1 font-lock-comment-face))
-             ("\\(_[0-9]+\\)"
-              . (1 font-lock-comment-face))
-             ("\\(#[0-9]+\\)"
-              . (1 font-lock-comment-face))
-             ("\\(\\?[0-9]+\\)"
-              . (1 font-lock-comment-face))
              ("*"
               . font-lock-builtin-face)
              ("?"
@@ -224,8 +229,6 @@
              ("&"
               . font-lock-type-face)
              (":"
-              . font-lock-builtin-face)
-             ("/"
               . font-lock-builtin-face)
              ("@"
               . font-lock-builtin-face)))))

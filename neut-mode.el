@@ -310,6 +310,7 @@ This function must be called from outside a string."
 ;;;###autoload
 (defun neut-mode-setup-lsp-mode ()
   (interactive)
+  (add-to-list 'lsp-language-id-configuration '(neut-mode . "neut"))
   (lsp-register-client
    (make-lsp-client :new-connection
                     (lsp-stdio-connection

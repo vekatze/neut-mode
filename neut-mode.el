@@ -108,12 +108,12 @@ an open paren is found, and decremented when a closing paren is found."
      (t
       (let ((token (neut--get-token (point))))
         (cond
+         ;; found a opening paren ("let")
          ((neut--let-symbol-p token)
-          ;; (essentially) found a opening paren
           (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
-         ;; (essentially) found a closing paren
-          ((string= token "in")
-           (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+         ;; found a closing paren ("in")
+         ((string= token "in")
+          (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
          ((string= token "")
           shallowest-pos)
          (t
@@ -276,7 +276,7 @@ This function must be called from outside a string."
   (setq font-lock-defaults
         `(,`((,(regexp-opt '("tau" "flow") 'symbols)
               . font-lock-type-face)
-             (,(regexp-opt '("attach" "bind" "case" "data" "declare" "default" "define" "detach" "do" "else" "else-if" "external" "if" "import" "in" "inline" "introspect" "let" "match" "mu" "of" "on" "resource" "then" "tie" "try" "type" "when" "with") 'symbols)
+             (,(regexp-opt '("attach" "bind" "case" "data" "declare" "default" "define" "detach" "do" "else" "else-if" "external" "fn" "if" "import" "in" "inline" "introspect" "let" "match" "mu" "of" "on" "resource" "then" "tie" "try" "type" "when" "with") 'symbols)
               . font-lock-keyword-face)
              (,(regexp-opt '("-" "->" ":" "=" "=>" "_" "assert" "magic" "target-arch" "target-os" "target-platform" "tuple") 'symbols)
               . font-lock-builtin-face)

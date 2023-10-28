@@ -40,14 +40,15 @@
   (if (or (neut--in-string-p (point))
           (neut--in-string-p (line-beginning-position)))
       (neut--get-indentation-of (point)) ;; leave strings as they are
-    (let* ((bullet-offset (neut--get-bullet-offset))
+    (let* ((bullet-offset (neut--get-bullet-offset (point)))
            (child-line-number (line-number-at-pos (point)))
            (child-indentation (neut--get-indentation-of child-line-number))
            (parent-pos-or-none (save-excursion
                                  (neut--goto-indent-base-position) ;; (*1)
                                  (neut--get-parent 0))) ;; (*2)
-           (parent-indentation (neut--get-indentation-of parent-pos-or-none)))
-      (+ parent-indentation neut-mode-indent-offset bullet-offset)))) ;; (*3)
+           (parent-indentation (neut--get-indentation-of parent-pos-or-none))
+           (parent-bullet-offset (* -1 (neut--get-bullet-offset parent-pos-or-none))))
+      (+ parent-indentation neut-mode-indent-offset bullet-offset parent-bullet-offset)))) ;; (*3)
 
 (defun neut--get-indentation-of (pos)
   (if pos
@@ -128,13 +129,16 @@ an open paren is found, and decremented when a closing paren is found."
 (defun neut--backtrack-closing-paren (eval-value max-eval-value shallowest-pos)
   (neut--find-shallowest-point (- eval-value 1) max-eval-value shallowest-pos))
 
-(defun neut--get-bullet-offset ()
-  (save-excursion
-    (goto-char (line-beginning-position))
-    (skip-chars-forward " ")
-    (if (re-search-forward "- " (+ (point) 2) t)
-        (* -1 neut-mode-indent-offset)
-      0)))
+(defun neut--get-bullet-offset (point-or-none)
+  (if (not point-or-none)
+      0
+    (save-excursion
+      (goto-char point-or-none)
+      (goto-char (line-beginning-position))
+      (skip-chars-forward " ")
+      (if (re-search-forward "- " (+ (point) 2) t)
+          (* -1 neut-mode-indent-offset)
+        0))))
 
 (defun neut--get-parent (let-level)
   "Find the nearest encloser of current point by backtracking. Returns nil if the encloser is the file itself.

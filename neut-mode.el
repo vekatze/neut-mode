@@ -106,11 +106,22 @@ an open paren is found, and decremented when a closing paren is found."
      ((neut--closing-paren-p char)
       (goto-char (- (point) 1))
       (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+     ;; opening angle
+     ((neut--opening-angle-p)
+      (goto-char (- (point) 1))
+      (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
+     ;; closing angle angle
+     ((neut--genuine-closing-angle-p)
+      (goto-char (- (point) 1))
+      (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+     ((neut--closing-angle-p)
+      (goto-char (- (point) 1))
+      (neut--find-shallowest-point eval-value max-eval-value shallowest-pos))
      (t
       (let ((token (neut--get-token (point))))
         (cond
          ;; found a opening paren ("let")
-         ((neut--let-symbol-p token)
+         ((neut--open-token-p token)
           (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
          ;; found a closing paren ("in")
          ((string= token "in")
@@ -140,10 +151,10 @@ an open paren is found, and decremented when a closing paren is found."
           (* -1 neut-mode-indent-offset)
         0))))
 
-(defun neut--get-parent (let-level)
+(defun neut--get-parent (nest-level)
   "Find the nearest encloser of current point by backtracking. Returns nil if the encloser is the file itself.
 
-The `let-level' is just to handle nested (let .. in).
+The `nest-level' is just to handle nested (let .. in).
 This function must be called from outside a string."
   (let ((char (preceding-char)))
     (cond
@@ -151,33 +162,45 @@ This function must be called from outside a string."
       nil)
      ((neut--skip-p char)
       (goto-char (- (point) 1))
-      (neut--get-parent let-level))
+      (neut--get-parent nest-level))
      ((neut--newline-p char)
       (goto-char (- (point) 1))
       (neut--skip-comment (point))
-      (neut--get-parent let-level))
+      (neut--get-parent nest-level))
      ((neut--opening-paren-p char)
       (point))
      ((neut--closing-paren-p char)
       (goto-char (scan-sexps (point) -1)) ;; skip a paren-pair
-      (neut--get-parent let-level))
+      (neut--get-parent nest-level))
+     ((neut--opening-angle-p)
+      (if (eq nest-level 0)
+          (point)
+        (goto-char (- (point) 1))
+        (neut--get-parent (- nest-level 1))))
+     ((neut--genuine-closing-angle-p)
+      (goto-char (- (point) 1))
+      (neut--get-parent (+ nest-level 1)))
+     ((neut--closing-angle-p) ;; -> or =>
+      (goto-char (- (point) 1))
+      (neut--get-parent nest-level)
+      )
      ((neut--double-quote-p char)
       (goto-char (scan-sexps (point) -1)) ;; skip a string
-      (neut--get-parent let-level))
+      (neut--get-parent nest-level))
      (t
       (let ((token (neut--get-token (point))))
         (cond
-         ((neut--let-symbol-p token)
+         ((neut--open-token-p token)
           (cond
-           ((eq let-level 0)
+           ((eq nest-level 0)
             (point))
            (t
-            (neut--get-parent (- let-level 1)))) ;; found the end of a nested let
+            (neut--get-parent (- nest-level 1))))
           )
-         ((string= token "in")
-          (neut--get-parent (+ let-level 1))) ;; found the beginning of a nested let
+         ((neut--close-token-p token)
+          (neut--get-parent (+ nest-level 1)))
          (t
-          (neut--get-parent let-level))))))))
+          (neut--get-parent nest-level))))))))
 
 (defun neut--get-token (initial-position)
   (let ((char (preceding-char)))
@@ -189,6 +212,24 @@ This function must be called from outside a string."
      (t
       (goto-char (- (point) 1))
       (neut--get-token initial-position)))))
+
+(defun neut--closing-angle-p ()
+  (let ((char (preceding-char)))
+    (equal char ?>)))
+
+(defun neut--genuine-closing-angle-p ()
+  (let ((char (preceding-char))
+        (str (buffer-substring-no-properties (- (point) 2) (point))))
+    (and (equal char ?>)
+         (not (equal str "->"))
+         (not (equal str "=>")))))
+
+(defun neut--opening-angle-p ()
+  (let ((char (preceding-char)))
+    (equal char ?<)))
+
+(defun neut--preceding-two-chars ()
+  ())
 
 (defun neut--make-hash-table (chars)
   (let ((table (make-hash-table :test 'equal)))
@@ -207,9 +248,11 @@ This function must be called from outside a string."
 (defconst neut--double-quote-char-set
   (neut--make-hash-table (list ?\")))
 (defconst neut--non-token-char-set
-  (neut--make-hash-table (list ?{ ?} ?\( ?\) ?\[ ?\] ?\s ?\n ?\;)))
-(defconst neut--let-symbol-set
-  (neut--make-hash-table (list "let" "tie" "try" "bind")))
+  (neut--make-hash-table (list ?{ ?} ?\( ?\) ?\[ ?\] ?< ?> ?\s ?\n ?\;)))
+(defconst neut--opening-token-set
+  (neut--make-hash-table (list "let" "tie" "try" "bind" "<")))
+(defconst neut--closing-token-set
+  (neut--make-hash-table (list "in" ">")))
 (defun neut--opening-paren-p (char)
   (gethash char neut--opening-paren-char-set))
 (defun neut--closing-paren-p (char)
@@ -222,12 +265,14 @@ This function must be called from outside a string."
   (gethash char neut--double-quote-char-set))
 (defun neut--non-token-p (char)
   (gethash char neut--non-token-char-set))
-(defun neut--let-symbol-p (char)
-  (gethash char neut--let-symbol-set))
+(defun neut--open-token-p (char)
+  (gethash char neut--opening-token-set))
+(defun neut--close-token-p (char)
+  (gethash char neut--closing-token-set))
 
 (defun neut--electric-indent-p (char)
   (save-excursion
-    (skip-chars-backward "[:alpha:]:_?!")
+    (skip-chars-backward "[:alpha:]:_?!") ;; space以外を飛ばす、くらいでもいい。
     (looking-at (regexp-opt '("in")))))
 
 ;;
@@ -262,11 +307,14 @@ This function must be called from outside a string."
   (set (make-local-variable 'comment-use-syntax) t)
   (set-syntax-table
    (let ((syntax-table (make-syntax-table)))
-     (modify-syntax-entry ?/ "_ 12" syntax-table)
+     (modify-syntax-entry ?/ ". 12" syntax-table)
      (modify-syntax-entry ?\n ">" syntax-table)
-     (modify-syntax-entry ?- "_" syntax-table)
+     ;; (modify-syntax-entry ?- "_" syntax-table)
+     (modify-syntax-entry ?- "w" syntax-table)
      (modify-syntax-entry ?_ "w" syntax-table)
-     (modify-syntax-entry ?. "." syntax-table)
+     (modify-syntax-entry ?. "." syntax-table) ;; "_" ?
+     ;; (modify-syntax-entry ?< "_" syntax-table)
+     ;; (modify-syntax-entry ?> "_" syntax-table)
      (modify-syntax-entry ?< "_" syntax-table)
      (modify-syntax-entry ?> "_" syntax-table)
      (modify-syntax-entry ?: "." syntax-table)
@@ -275,37 +323,66 @@ This function must be called from outside a string."
      (modify-syntax-entry ?? "w" syntax-table)
      syntax-table))
   (setq-local indent-line-function 'neut-mode-indent-line)
+  (setq-local xref-prompt-for-identifier nil)
   (add-hook 'electric-indent-functions #'neut--electric-indent-p nil 'local)
   (define-key neut-mode-map "-" #'neut--insert-bullet)
   (setq font-lock-defaults
-        `(,`((,(regexp-opt '("tau" "flow") 'symbols)
+        `(,`((,(regexp-opt '("tau" "flow" "Pi") 'words)
               . font-lock-type-face)
-             (,(regexp-opt '("attach" "bind" "case" "data" "declare" "default" "define" "detach" "do" "else" "else-if" "external" "fn" "if" "import" "in" "inline" "introspect" "let" "match" "mu" "of" "on" "resource" "then" "tie" "try" "type" "when" "with") 'symbols)
+             (,(regexp-opt '("assume" "attach" "bind" "case" "constant" "data" "declare" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "idealize" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "mutual" "of" "on" "resource" "tie" "try" "use" "when" "with") 'words)
               . font-lock-keyword-face)
-             (,(regexp-opt '("-" "->" ":" "=" "=>" "_" "assert" "magic" "target-arch" "target-os" "target-platform" "tuple") 'symbols)
+             (,(regexp-opt '("-" "->" "->>" ":" "=" "=>" "_") 'symbols)
+              . font-lock-builtin-face)
+             (,(regexp-opt '("assert" "magic" "target-arch" "target-os" "target-platform" "tuple") 'words)
               . font-lock-builtin-face)
              (,(regexp-opt '("::") 'symbols)
               . font-lock-type-face)
-             (,(regexp-opt '("admit") 'symbols)
+             (,(regexp-opt '("admit") 'words)
               . font-lock-warning-face)
-             (,(regexp-opt '("this" "base") 'symbols)
+             (,(regexp-opt '("this") 'words)
               . font-lock-constant-face)
-             ("\\<\[A-Z\]\[-A-Za-z0-9\]\*\\>"
+             ("\\_<_?\[A-Z\]\[-A-Za-z0-9\]\*\\_>"
               . font-lock-type-face)
-             ("define +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
+             ("\\<define\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
-             ("inline +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
+             ("\\<inline\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
-             ("data +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
+             ("\\<real\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
-             ("type +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
+             ("\\<realize\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
+             ("\\<data\\> +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
+              . (1 font-lock-function-name-face))
+             ("\\<constant\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
+              . (1 font-lock-constant-face))
+             ("\\<resource\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
+              . (1 font-lock-constant-face))
+             ("\\<trope\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
+              . (1 font-lock-constant-face))
+             ("\\<declare\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
+              . (1 font-lock-function-name-face))
+             ("\\<nominal\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
+              . (1 font-lock-function-name-face))
+             ("\\<assume\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
+              . (1 font-lock-function-name-face))
+             ("\\(/[0-9]+\\)"
+              . (1 font-lock-comment-face))
              ("*"
+              . font-lock-builtin-face)
+             ("+"
+              . font-lock-builtin-face)
+             ("\\\\"
+              . font-lock-builtin-face)
+             ("|"
+              . font-lock-builtin-face)
+             ("!"
+              . font-lock-builtin-face)
+             ("#"
               . font-lock-builtin-face)
              ("?"
               . font-lock-type-face)
              ("&"
-              . font-lock-type-face)
+              . font-lock-builtin-face)
              (":"
               . font-lock-builtin-face)
              ("@"

@@ -250,7 +250,7 @@ This function must be called from outside a string."
 (defconst neut--non-token-char-set
   (neut--make-hash-table (list ?{ ?} ?\( ?\) ?\[ ?\] ?< ?> ?\s ?\n ?\;)))
 (defconst neut--opening-token-set
-  (neut--make-hash-table (list "let" "tie" "try" "bind" "<")))
+  (neut--make-hash-table (list "let" "tie" "try" "bind" "use" "<")))
 (defconst neut--closing-token-set
   (neut--make-hash-table (list "in" ">")))
 (defun neut--opening-paren-p (char)
@@ -270,10 +270,11 @@ This function must be called from outside a string."
 (defun neut--close-token-p (char)
   (gethash char neut--closing-token-set))
 
-(defun neut--electric-indent-p (char)
+(defun neut--electric-indent-p (_)
   (save-excursion
-    (skip-chars-backward "[:alpha:]:_?!") ;; space以外を飛ばす、くらいでもいい。
-    (looking-at (regexp-opt '("in")))))
+    (goto-char (line-beginning-position))
+    (skip-chars-forward "[:space:]")
+    (looking-at "in")))
 
 ;;
 ;; utils
@@ -310,9 +311,10 @@ This function must be called from outside a string."
      (modify-syntax-entry ?/ ". 12" syntax-table)
      (modify-syntax-entry ?\n ">" syntax-table)
      ;; (modify-syntax-entry ?- "_" syntax-table)
-     (modify-syntax-entry ?- "w" syntax-table)
+     ;; (modify-syntax-entry ?- "w" syntax-table)
      (modify-syntax-entry ?_ "w" syntax-table)
-     (modify-syntax-entry ?. "." syntax-table) ;; "_" ?
+     ;; (modify-syntax-entry ?. "." syntax-table) ;; "_" ?
+     (modify-syntax-entry ?. "_" syntax-table) ;; "_" ?
      ;; (modify-syntax-entry ?< "_" syntax-table)
      ;; (modify-syntax-entry ?> "_" syntax-table)
      (modify-syntax-entry ?< "_" syntax-table)
@@ -327,9 +329,10 @@ This function must be called from outside a string."
   (add-hook 'electric-indent-functions #'neut--electric-indent-p nil 'local)
   (define-key neut-mode-map "-" #'neut--insert-bullet)
   (setq font-lock-defaults
-        `(,`((,(regexp-opt '("tau" "flow" "Pi") 'words)
+        `(,`(("^=.*" . font-lock-doc-face)
+             (,(regexp-opt '("tau" "flow" "Pi") 'words)
               . font-lock-type-face)
-             (,(regexp-opt '("assume" "attach" "bind" "case" "constant" "data" "declare" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "idealize" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "mutual" "of" "on" "resource" "tie" "try" "use" "when" "with") 'words)
+             (,(regexp-opt '("arrow" "assume" "attach" "bind" "call" "case" "constant" "contract" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "fn" "foreign" "idealize" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "mutual" "nominal" "of" "on" "resource" "tie" "try" "use" "variadic" "when" "with") 'words)
               . font-lock-keyword-face)
              (,(regexp-opt '("-" "->" "->>" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)
@@ -341,8 +344,10 @@ This function must be called from outside a string."
               . font-lock-warning-face)
              (,(regexp-opt '("this") 'words)
               . font-lock-constant-face)
-             ("\\_<_?\[A-Z\]\[-A-Za-z0-9\]\*\\_>"
-              . font-lock-type-face)
+             ("\\_<_?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\_>"
+              . (1 font-lock-type-face))
+             ("\\_<_?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\."
+              . (1 font-lock-type-face))
              ("\\<define\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
              ("\\<inline\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
@@ -386,7 +391,8 @@ This function must be called from outside a string."
              (":"
               . font-lock-builtin-face)
              ("@"
-              . font-lock-builtin-face)))))
+              . font-lock-builtin-face))))
+  )
 
 ;;;###autoload
 (defun neut-mode-setup-lsp-mode ()

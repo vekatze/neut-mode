@@ -9,27 +9,29 @@
 ;;; Code:
 
 ;;
-;; indentation
+;; Indentation
 ;;
 
-;; the indentation of current line can be calculated as follows:
+;; The indentation of current line can be calculated as follows:
 ;;
-;;   (*1) find the shallowest part(s) of current line and go there
-;;   (*2) backtrack and find the nearest encloser
+;;   (*1) Find the shallowest part(s) of current line and go there
+;;   (*2) Backtrack and find the nearest encloser
 ;;   (*3) (current line's indentation) = (the indentation of the nearest encloser) + offset
 ;;
-;; tips:
+;; Tips:
 ;;
-;;   1. the indentation of the root encloser should be regarded as (-1) * base-offset
-;;   2. `let .. in' is also a parenthesis pair, just like `(..)'
+;;   1. The indentation of the root encloser should be regarded as (-1) * base-offset
+;;   2. Think of `let .. in' as a parenthesis pair like `(..)'
 
 
 (defvar neut-mode-indent-offset 2)
 
 (defun neut--get-offset-from-eol ()
+  "Calculate the offset from eol."
   (- (line-end-position) (point)))
 
 (defun neut-mode-indent-line ()
+  "Indent current line."
   (interactive)
   (let ((original-offset-from-eol (neut--get-offset-from-eol)))
     (indent-line-to (neut--calculate-indentation))
@@ -37,12 +39,11 @@
       (goto-char (- (line-end-position) original-offset-from-eol)))))
 
 (defun neut--calculate-indentation ()
+  "Calculate the (new) indentation of current line."
   (if (or (neut--in-string-p (point))
           (neut--in-string-p (line-beginning-position)))
       (neut--get-indentation-of (point)) ;; leave strings as they are
     (let* ((bullet-offset (neut--get-bullet-offset (point)))
-           (child-line-number (line-number-at-pos (point)))
-           (child-indentation (neut--get-indentation-of child-line-number))
            (parent-pos-or-none (save-excursion
                                  (neut--goto-indent-base-position) ;; (*1)
                                  (neut--get-parent 0))) ;; (*2)
@@ -51,6 +52,7 @@
       (+ parent-indentation neut-mode-indent-offset bullet-offset parent-bullet-offset)))) ;; (*3)
 
 (defun neut--get-indentation-of (pos)
+  "Get the (current) indentation of the line in which POS exists."
   (if pos
       (save-excursion
         (neut--goto-line (line-number-at-pos pos))
@@ -58,25 +60,31 @@
     (* -1 neut-mode-indent-offset)))
 
 (defun neut--goto-indent-base-position ()
+  "Find a starting point to calculate the indentation of current line."
   (goto-char (line-end-position))
   (goto-char (neut--find-shallowest-point 0 0 (point))))
 
 (defun neut--goto-line (line-number)
+  "Go to LINE-NUMBER."
   (goto-char (point-min))
   (forward-line (- line-number 1)))
 
 (defun neut--goto-first-char-column ()
+  "Go to the first non-space character of the current line."
   (goto-char (line-beginning-position))
   (skip-chars-forward " ")
   (current-column))
 
 (defun neut--get-first-char-column ()
+  "Calculate the first column of the first non-space character of the current line."
   (save-excursion (neut--goto-first-char-column)))
 
 (defun neut--in-string-p (pos)
+  "Return non-nil value iff POS is inside a string."
   (nth 3 (syntax-ppss pos)))
 
 (defun neut--skip-comment (start)
+  "Read backward from START until all the line comments are skipped."
   (interactive)
   (when (re-search-backward "//" (line-beginning-position) t)
     (let ((pos (match-beginning 0)))
@@ -84,11 +92,17 @@
           (goto-char start)
         (neut--skip-comment pos)))))
 
-(defun neut--find-shallowest-point (eval-value max-eval-value shallowest-pos)
-  "Backtrack from the end of a line and find (one of) the shallowest point of the line.
+(defun neut--find-shallowest-point (shallowness shallowest shallowest-pos)
+  "Read backward from the eol to find (one of) the shallowest point of the line.
 
-The shallowness of a point is evaluated by `eval-value'; This value is incremented when
-an open paren is found, and decremented when a closing paren is found."
+The shallowness of a point is evaluated by `SHALLOWNESS'.  This value is
+incremented when an open paren is found, and decremented when a closing paren
+is found.
+
+The argument `SHALLOWEST' and `SHALLOWEST-POS' tracks the shallowest point
+so far.
+
+The `SHALLOWEST-POS' will be returned as the result of this function."
   (let ((char (preceding-char)))
     (cond
      ((= char 0)
@@ -97,50 +111,68 @@ an open paren is found, and decremented when a closing paren is found."
       shallowest-pos)
      ((= char ? )
       (goto-char (- (point) 1))
-      (neut--find-shallowest-point eval-value max-eval-value shallowest-pos))
+      (neut--find-shallowest-point shallowness shallowest shallowest-pos))
      ;; found an opening paren
      ((neut--opening-paren-p char)
       (goto-char (- (point) 1))
-      (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
+      (neut--backtrack-opening-paren shallowness shallowest shallowest-pos))
      ;; found a closing paren
      ((neut--closing-paren-p char)
       (goto-char (- (point) 1))
-      (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+      (neut--backtrack-closing-paren shallowness shallowest shallowest-pos))
      ;; opening angle
      ((neut--opening-angle-p)
       (goto-char (- (point) 1))
-      (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
+      (neut--backtrack-opening-paren shallowness shallowest shallowest-pos))
      ;; closing angle angle
      ((neut--genuine-closing-angle-p)
       (goto-char (- (point) 1))
-      (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+      (neut--backtrack-closing-paren shallowness shallowest shallowest-pos))
      ((neut--closing-angle-p)
       (goto-char (- (point) 1))
-      (neut--find-shallowest-point eval-value max-eval-value shallowest-pos))
+      (neut--find-shallowest-point shallowness shallowest shallowest-pos))
      (t
       (let ((token (neut--get-token (point))))
         (cond
          ;; found a opening paren ("let")
          ((neut--open-token-p token)
-          (neut--backtrack-opening-paren eval-value max-eval-value shallowest-pos))
+          (neut--backtrack-opening-paren shallowness shallowest shallowest-pos))
          ;; found a closing paren ("in")
          ((string= token "in")
-          (neut--backtrack-closing-paren eval-value max-eval-value shallowest-pos))
+          (neut--backtrack-closing-paren shallowness shallowest shallowest-pos))
          ((string= token "")
           shallowest-pos)
          (t
-          (neut--find-shallowest-point eval-value max-eval-value shallowest-pos))))))))
+          (neut--find-shallowest-point shallowness shallowest shallowest-pos))))))))
 
-(defun neut--backtrack-opening-paren (eval-value max-eval-value shallowest-pos)
-  (let ((next-eval-value (+ eval-value 1)))
-    (if (> next-eval-value max-eval-value)
-        (neut--find-shallowest-point next-eval-value next-eval-value (point))
-      (neut--find-shallowest-point next-eval-value max-eval-value shallowest-pos))))
+(defun neut--backtrack-opening-paren (shallowness shallowest shallowest-pos)
+  "After updating `SHALLOWEST' if necessary, continue reading backwards.
 
-(defun neut--backtrack-closing-paren (eval-value max-eval-value shallowest-pos)
-  (neut--find-shallowest-point (- eval-value 1) max-eval-value shallowest-pos))
+The `SHALLOWEST' must be updated if current SHALLOWNESS is bigger than
+SHALLOWEST.  In such a case, `SHALLOWEST-POS' is also updated to the current
+position of the cursor.
+
+This function can be called only when the cursor is just before an opening
+parenthesis, like: `foo<CURSOR>(bar buz)'."
+  (let ((next-shallowness (+ shallowness 1)))
+    (if (> next-shallowness shallowest)
+        (neut--find-shallowest-point next-shallowness next-shallowness (point))
+      (neut--find-shallowest-point next-shallowness shallowest shallowest-pos))))
+
+(defun neut--backtrack-closing-paren (shallowness shallowest shallowest-pos)
+  "After updating `SHALLOWEST' if necessary, continue reading backwards.
+
+The `SHALLOWEST' must be updated if current SHALLOWNESS is bigger than
+SHALLOWEST.  In such a case, `SHALLOWEST-POS' is also updated to the current
+position of the cursor.
+
+This function can be called only when the cursor is just after an opening
+parenthesis, like: `foo(bar buz)<CURSOR>'."
+  (neut--find-shallowest-point (- shallowness 1) shallowest shallowest-pos))
 
 (defun neut--get-bullet-offset (point-or-none)
+  "Return -2 if the line of `POINT-OR-NONE' begins from `- '.
+Otherwise, return 0."
   (if (not point-or-none)
       0
     (save-excursion
@@ -152,9 +184,10 @@ an open paren is found, and decremented when a closing paren is found."
         0))))
 
 (defun neut--get-parent (nest-level)
-  "Find the nearest encloser of current point by backtracking. Returns nil if the encloser is the file itself.
+  "Find the nearest encloser of current point by backtracking.
+Return nil if the encloser is the file itself.
 
-The `nest-level' is just to handle nested (let .. in).
+The `NEST-LEVEL' tracks the nest level of `let .. in'.
 This function must be called from outside a string."
   (let ((char (preceding-char)))
     (cond
@@ -201,6 +234,7 @@ This function must be called from outside a string."
           (neut--get-parent nest-level))))))))
 
 (defun neut--get-token (initial-position)
+  "Read backward from `INITIAL-POSITION' and get a token."
   (let ((char (preceding-char)))
     (cond
      ((eq (point) (line-beginning-position))
@@ -212,10 +246,12 @@ This function must be called from outside a string."
       (neut--get-token initial-position)))))
 
 (defun neut--closing-angle-p ()
+  "Return non-nil iff the character on the cursor is `>'."
   (let ((char (preceding-char)))
     (equal char ?>)))
 
 (defun neut--genuine-closing-angle-p ()
+  "Return non-nil iff the cursor is on `>', and not on `->' or `=>'."
   (let ((char (preceding-char))
         (str (buffer-substring-no-properties (- (point) 2) (point))))
     (and (equal char ?>)
@@ -223,10 +259,12 @@ This function must be called from outside a string."
          (not (equal str "=>")))))
 
 (defun neut--opening-angle-p ()
+  "Return non-nil iff the character on the cursor is `<'."
   (let ((char (preceding-char)))
     (equal char ?<)))
 
 (defun neut--make-hash-table (chars)
+  "Create a new hash table using a list of characters `CHARS'."
   (let ((table (make-hash-table :test 'equal)))
     (dolist (char chars)
       (puthash char t table))
@@ -249,23 +287,34 @@ This function must be called from outside a string."
 (defconst neut--closing-token-set
   (neut--make-hash-table (list "in" ">")))
 (defun neut--opening-paren-p (char)
+  "Return non-nil iff `CHAR' is an opening paren."
   (gethash char neut--opening-paren-char-set))
 (defun neut--closing-paren-p (char)
+  "Return non-nil iff `CHAR' is a closing paren."
   (gethash char neut--closing-paren-char-set))
 (defun neut--skip-p (char)
+  "Return non-nil iff `CHAR' must be skipped during backtracking."
   (gethash char neut--skip-char-set))
 (defun neut--newline-p (char)
+  "Return non-nil iff `CHAR' is a newline."
   (gethash char neut--newline-char-set))
 (defun neut--double-quote-p (char)
+  "Return non-nil iff `CHAR' is a double quote."
   (gethash char neut--double-quote-char-set))
 (defun neut--non-token-p (char)
+  "Return non-nil iff `CHAR' is a non-token character."
   (gethash char neut--non-token-char-set))
 (defun neut--open-token-p (char)
+  "Return non-nil iff `CHAR' is an opening token."
   (gethash char neut--opening-token-set))
 (defun neut--close-token-p (char)
+  "Return non-nil iff `CHAR' is a closing token."
   (gethash char neut--closing-token-set))
 
 (defun neut--electric-indent-p (_)
+  "Return non-nil if the current line should be indented now.
+
+Intended to be used with `electric-indent-functions'."
   (save-excursion
     (goto-char (line-beginning-position))
     (skip-chars-forward "[:space:]")
@@ -276,9 +325,11 @@ This function must be called from outside a string."
 ;;
 
 (defun neut--line-empty-p ()
+  "Return non-nil if the current line is empty."
   (string-match-p "\\`\\s-*$" (thing-at-point 'line)))
 
 (defun neut--insert-bullet ()
+  "Insert '- '."
   (interactive)
   (cond
    ((= (point) (line-beginning-position))
@@ -295,7 +346,7 @@ This function must be called from outside a string."
 
 ;;;###autoload
 (define-derived-mode neut-mode prog-mode "neut"
-  "A major mode for neut."
+  "A major mode for Neut."
   (setq-local comment-start "//")
   (setq-local comment-end "")
   (set (make-local-variable 'comment-padding) 1)
@@ -378,6 +429,7 @@ This function must be called from outside a string."
 
 ;;;###autoload
 (defun neut-mode-setup-lsp-mode ()
+  "Configure the LSP server for lsp-mode."
   (interactive)
   (add-to-list 'lsp-language-id-configuration '(neut-mode . "neut"))
   (lsp-register-client
@@ -389,6 +441,7 @@ This function must be called from outside a string."
 
 ;;;###autoload
 (defun neut-mode-setup-eglot ()
+  "Configure the LSP server for eglot."
   (interactive)
   (setq-local eglot-server-programs
               `((neut-mode . ("neut" "lsp" "--no-color")))))

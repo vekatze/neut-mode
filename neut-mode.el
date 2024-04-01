@@ -1,8 +1,8 @@
 ;;; neut-mode.el --- A major mode for Neut -*- lexical-binding: t; -*-
 
 ;; Author: vekatze <vekatze@icloud.com>
-;; Package-Requires: ((emacs "27.1") (lsp-mode "8.0.1"))
 ;; Version: 1.0.0
+;; Package-Requires: ((emacs "27.1"))
 ;; URL: https://github.com/vekatze/neut-mode
 
 ;;; Commentary:
@@ -263,7 +263,7 @@ This function must be called from outside a string."
 
 (defun neut--make-hash-table (chars)
   "Create a new hash table using a list of characters `CHARS'."
-  (let ((table (make-hash-table :test 'equal)))
+  (let ((table (make-hash-table :test #'equal)))
     (dolist (char chars)
       (puthash char t table))
     table))
@@ -364,7 +364,7 @@ Intended to be used with `electric-indent-functions'."
      (modify-syntax-entry ?* "." syntax-table)
      (modify-syntax-entry ?& "." syntax-table)
      syntax-table))
-  (setq-local indent-line-function 'neut-mode-indent-line)
+  (setq-local indent-line-function #'neut-mode-indent-line)
   (setq-local xref-prompt-for-identifier nil)
   (add-hook 'electric-indent-functions #'neut--electric-indent-p nil 'local)
   (define-key neut-mode-map "-" #'neut--insert-bullet)

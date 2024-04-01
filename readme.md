@@ -1,7 +1,17 @@
 # neut-mode
 
-An Emacs major mode for Neut that provides:
+`neut-mode` is a major mode for the [Neut](https://vekatze.github.io/neut) programming language.
 
-- syntax highlighting,
-- automatic indentation, and
+## Features
+
+- Syntax highlighting
+- Automatic indentation
 - LSP support (for `lsp-mode` and `eglot`)
+
+## Example Screencast
+
+![completion](https://vekatze.github.io/neut/image/screencasts/completion.gif "completion")
+
+You can find all the LSP features at:
+
+https://vekatze.github.io/neut/lovely-lsp-showcase.html

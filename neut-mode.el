@@ -182,8 +182,7 @@ This function must be called from outside a string."
       (neut--get-parent (+ nest-level 1)))
      ((neut--closing-angle-p) ;; -> or =>
       (goto-char (- (point) 1))
-      (neut--get-parent nest-level)
-      )
+      (neut--get-parent nest-level))
      ((neut--double-quote-p char)
       (goto-char (scan-sexps (point) -1)) ;; skip a string
       (neut--get-parent nest-level))
@@ -195,8 +194,7 @@ This function must be called from outside a string."
            ((eq nest-level 0)
             (point))
            (t
-            (neut--get-parent (- nest-level 1))))
-          )
+            (neut--get-parent (- nest-level 1)))))
          ((neut--close-token-p token)
           (neut--get-parent (+ nest-level 1)))
          (t
@@ -227,9 +225,6 @@ This function must be called from outside a string."
 (defun neut--opening-angle-p ()
   (let ((char (preceding-char)))
     (equal char ?<)))
-
-(defun neut--preceding-two-chars ()
-  ())
 
 (defun neut--make-hash-table (chars)
   (let ((table (make-hash-table :test 'equal)))
@@ -287,8 +282,7 @@ This function must be called from outside a string."
   (interactive)
   (cond
    ((= (point) (line-beginning-position))
-    (insert "- ")
-    )
+    (insert "- "))
    ((not (neut--line-empty-p))
     (insert "-"))
    (t
@@ -310,19 +304,16 @@ This function must be called from outside a string."
    (let ((syntax-table (make-syntax-table)))
      (modify-syntax-entry ?/ ". 12" syntax-table)
      (modify-syntax-entry ?\n ">" syntax-table)
-     ;; (modify-syntax-entry ?- "_" syntax-table)
-     ;; (modify-syntax-entry ?- "w" syntax-table)
+     (modify-syntax-entry ?- "w" syntax-table)
      (modify-syntax-entry ?_ "w" syntax-table)
-     ;; (modify-syntax-entry ?. "." syntax-table) ;; "_" ?
-     (modify-syntax-entry ?. "_" syntax-table) ;; "_" ?
-     ;; (modify-syntax-entry ?< "_" syntax-table)
-     ;; (modify-syntax-entry ?> "_" syntax-table)
+     (modify-syntax-entry ?. "_" syntax-table)
      (modify-syntax-entry ?< "_" syntax-table)
      (modify-syntax-entry ?> "_" syntax-table)
      (modify-syntax-entry ?: "." syntax-table)
      (modify-syntax-entry ?+ "_" syntax-table)
-     (modify-syntax-entry ?* "_" syntax-table)
-     (modify-syntax-entry ?? "w" syntax-table)
+     (modify-syntax-entry ?? "_" syntax-table)
+     (modify-syntax-entry ?* "." syntax-table)
+     (modify-syntax-entry ?& "." syntax-table)
      syntax-table))
   (setq-local indent-line-function 'neut-mode-indent-line)
   (setq-local xref-prompt-for-identifier nil)
@@ -330,13 +321,13 @@ This function must be called from outside a string."
   (define-key neut-mode-map "-" #'neut--insert-bullet)
   (setq font-lock-defaults
         `(,`(("^=.*" . font-lock-doc-face)
-             (,(regexp-opt '("tau" "flow" "Pi") 'words)
+             (,(regexp-opt '("tau" "flow") 'words)
               . font-lock-type-face)
-             (,(regexp-opt '("arrow" "assume" "attach" "bind" "call" "case" "constant" "contract" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "fn" "foreign" "idealize" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "mutual" "nominal" "of" "on" "resource" "tie" "try" "use" "variadic" "when" "with") 'words)
+             (,(regexp-opt '("arrow" "attach" "bind" "case" "constant" "data" "default" "define" "detach" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "nominal" "of" "on" "resource" "tie" "try" "use" "when" "with") 'words)
               . font-lock-keyword-face)
              (,(regexp-opt '("-" "->" "->>" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)
-             (,(regexp-opt '("assert" "magic" "target-arch" "target-os" "target-platform" "tuple") 'words)
+             (,(regexp-opt '("assert" "magic" "target-arch" "target-os" "target-platform") 'words)
               . font-lock-builtin-face)
              (,(regexp-opt '("::") 'symbols)
               . font-lock-type-face)
@@ -344,17 +335,13 @@ This function must be called from outside a string."
               . font-lock-warning-face)
              (,(regexp-opt '("this") 'words)
               . font-lock-constant-face)
-             ("\\_<_?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\_>"
+             ("\\_<_?\\.?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\_>"
               . (1 font-lock-type-face))
-             ("\\_<_?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\."
+             ("\\_<_?\\.?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\."
               . (1 font-lock-type-face))
              ("\\<define\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
              ("\\<inline\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("\\<real\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("\\<realize\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
              ("\\<data\\> +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
               . (1 font-lock-function-name-face))
@@ -362,10 +349,6 @@ This function must be called from outside a string."
               . (1 font-lock-constant-face))
              ("\\<resource\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-constant-face))
-             ("\\<trope\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
-              . (1 font-lock-constant-face))
-             ("\\<declare\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
              ("\\<nominal\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
              ("\\<assume\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
@@ -391,8 +374,7 @@ This function must be called from outside a string."
              (":"
               . font-lock-builtin-face)
              ("@"
-              . font-lock-builtin-face))))
-  )
+              . font-lock-builtin-face)))))
 
 ;;;###autoload
 (defun neut-mode-setup-lsp-mode ()

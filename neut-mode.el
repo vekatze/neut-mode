@@ -1,28 +1,15 @@
-;;; neut-mode.el --- neut mode -*- lexical-binding: t; -*-
+;;; neut-mode.el --- A major mode for Neut -*- lexical-binding: t; -*-
 
 ;; Author: vekatze <vekatze@icloud.com>
+;; Package-Requires: ((emacs "27.1") (lsp-mode "8.0.1"))
+;; Version: 1.0.0
+;; URL: https://github.com/vekatze/neut-mode
 
 ;;; Commentary:
 
 ;; A major mode for Neut.
 
 ;;; Code:
-
-;;
-;; Indentation
-;;
-
-;; The indentation of current line can be calculated as follows:
-;;
-;;   (*1) Find the shallowest part(s) of current line and go there
-;;   (*2) Backtrack and find the nearest encloser
-;;   (*3) (current line's indentation) = (the indentation of the nearest encloser) + offset
-;;
-;; Tips:
-;;
-;;   1. The indentation of the root encloser should be regarded as (-1) * base-offset
-;;   2. Think of `let .. in' as a parenthesis pair like `(..)'
-
 
 (defvar neut-mode-indent-offset 2)
 
@@ -39,7 +26,18 @@
       (goto-char (- (line-end-position) original-offset-from-eol)))))
 
 (defun neut--calculate-indentation ()
-  "Calculate the (new) indentation of current line."
+  "Calculate the (new) indentation of current line.
+
+The indentation of a line can be calculated as follows:
+
+  (*1) Find the shallowest part(s) of a line and go there
+  (*2) Backtrack and find the nearest encloser
+  (*3) (indentation) = (the indentation of the nearest encloser) + offset
+
+Tips:
+
+  1. The indentation of the root encloser is (-1) * base-offset
+  2. Think of `let .. in' as a parenthesis pair like `(..)'"
   (if (or (neut--in-string-p (point))
           (neut--in-string-p (line-beginning-position)))
       (neut--get-indentation-of (point)) ;; leave strings as they are
@@ -428,9 +426,7 @@ Intended to be used with `electric-indent-functions'."
               . font-lock-builtin-face)))))
 
 ;;;###autoload
-(defun neut-mode-setup-lsp-mode ()
-  "Configure the LSP server for lsp-mode."
-  (interactive)
+(when (require 'lsp-mode nil t)
   (add-to-list 'lsp-language-id-configuration '(neut-mode . "neut"))
   (lsp-register-client
    (make-lsp-client :new-connection
@@ -440,9 +436,7 @@ Intended to be used with `electric-indent-functions'."
                     :major-modes '(neut-mode))))
 
 ;;;###autoload
-(defun neut-mode-setup-eglot ()
-  "Configure the LSP server for eglot."
-  (interactive)
+(when (require 'eglot nil t)
   (setq-local eglot-server-programs
               `((neut-mode . ("neut" "lsp" "--no-color")))))
 

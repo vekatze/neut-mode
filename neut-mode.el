@@ -2,7 +2,7 @@
 
 ;; Author: vekatze <vekatze@icloud.com>
 ;; Version: 1.0.0
-;; Package-Requires: ((emacs "27.1"))
+;; Package-Requires: ((emacs "29"))
 ;; URL: https://github.com/vekatze/neut-mode
 
 ;;; Commentary:

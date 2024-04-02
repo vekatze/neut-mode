@@ -146,8 +146,8 @@ The `SHALLOWEST-POS' will be returned as the result of this function."
 (defun neut--backtrack-opening-paren (shallowness shallowest shallowest-pos)
   "After updating `SHALLOWEST' if necessary, continue reading backwards.
 
-The `SHALLOWEST' must be updated if current SHALLOWNESS is bigger than
-SHALLOWEST.  In such a case, `SHALLOWEST-POS' is also updated to the current
+The `SHALLOWEST' must be updated if current `SHALLOWNESS' is bigger than
+`SHALLOWEST'.  In such a case, `SHALLOWEST-POS' is also updated to the current
 position of the cursor.
 
 This function can be called only when the cursor is just before an opening
@@ -161,7 +161,7 @@ parenthesis, like: `foo<CURSOR>(bar buz)'."
   "After updating `SHALLOWEST' if necessary, continue reading backwards.
 
 The `SHALLOWEST' must be updated if current SHALLOWNESS is bigger than
-SHALLOWEST.  In such a case, `SHALLOWEST-POS' is also updated to the current
+`SHALLOWEST'.  In such a case, `SHALLOWEST-POS' is also updated to the current
 position of the cursor.
 
 This function can be called only when the cursor is just after an opening

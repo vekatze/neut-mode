@@ -11,9 +11,9 @@
 
 ;;; Code:
 
-;;
-;; calculating indentations
-;;
+;; ----------------------
+;; calculate indentations
+;; ----------------------
 
 (defvar neut-mode-indent-offset 2)
 
@@ -322,9 +322,9 @@ Intended to be used with `electric-indent-functions'."
     (skip-chars-forward "[:space:]")
     (looking-at "in")))
 
-;;
+;; -----
 ;; utils
-;;
+;; -----
 
 (defun neut--line-empty-p ()
   "Return non-nil if the current line is empty."
@@ -342,9 +342,9 @@ Intended to be used with `electric-indent-functions'."
     (insert "- ")
     (indent-according-to-mode))))
 
-;;
-;; defining the major mode
-;;
+;; ---------------------
+;; define the major mode
+;; ---------------------
 
 ;;;###autoload
 (define-derived-mode neut-mode prog-mode "neut"

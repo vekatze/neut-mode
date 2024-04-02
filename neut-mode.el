@@ -7,9 +7,13 @@
 
 ;;; Commentary:
 
-;; A major mode for Neut.
+;; A major mode for the Neut programming language.
 
 ;;; Code:
+
+;;
+;; calculating indentations
+;;
 
 (defvar neut-mode-indent-offset 2)
 
@@ -339,7 +343,7 @@ Intended to be used with `electric-indent-functions'."
     (indent-according-to-mode))))
 
 ;;
-;; defining major mode
+;; defining the major mode
 ;;
 
 ;;;###autoload
@@ -400,10 +404,6 @@ Intended to be used with `electric-indent-functions'."
               . (1 font-lock-constant-face))
              ("\\<nominal\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
-             ("\\<assume\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("\\(/[0-9]+\\)"
-              . (1 font-lock-comment-face))
              ("*"
               . font-lock-builtin-face)
              ("+"

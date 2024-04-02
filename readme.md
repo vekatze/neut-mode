@@ -6,7 +6,7 @@
 
 - Syntax highlighting
 - Automatic indentation
-- LSP support (for `lsp-mode` and `eglot`)
+- LSP integration (for `lsp-mode` and `eglot`)
 
 ## Example Screencast
 

@@ -414,6 +414,10 @@ Intended to be used with `electric-indent-functions'."
               . font-lock-builtin-face)
              ("!"
               . font-lock-builtin-face)
+             (","
+              . font-lock-builtin-face)
+             (";"
+              . font-lock-builtin-face)
              ("#"
               . font-lock-builtin-face)
              ("?"

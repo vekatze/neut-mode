@@ -181,7 +181,7 @@ Otherwise, return 0."
       (goto-char point-or-none)
       (goto-char (line-beginning-position))
       (skip-chars-forward " ")
-      (if (re-search-forward "- " (+ (point) 2) t)
+      (if (re-search-forward "| " (+ (point) 2) t)
           (* -1 neut-mode-indent-offset)
         0))))
 
@@ -330,16 +330,16 @@ Intended to be used with `electric-indent-functions'."
   "Return non-nil if the current line is empty."
   (string-match-p "\\`\\s-*$" (thing-at-point 'line)))
 
-(defun neut--insert-bullet ()
-  "Insert '- '."
+(defun neut--insert-bar ()
+  "Insert '| '."
   (interactive)
   (cond
    ((= (point) (line-beginning-position))
-    (insert "- "))
+    (insert "| "))
    ((not (neut--line-empty-p))
-    (insert "-"))
+    (insert "|"))
    (t
-    (insert "- ")
+    (insert "| ")
     (indent-according-to-mode))))
 
 ;; ---------------------
@@ -371,7 +371,7 @@ Intended to be used with `electric-indent-functions'."
   (setq-local indent-line-function #'neut-mode-indent-line)
   (setq-local xref-prompt-for-identifier nil)
   (add-hook 'electric-indent-functions #'neut--electric-indent-p nil 'local)
-  (define-key neut-mode-map "-" #'neut--insert-bullet)
+  (define-key neut-mode-map "|" #'neut--insert-bar)
   (setq font-lock-defaults
         `(,`(("^=.*" . font-lock-doc-face)
              (,(regexp-opt '("tau" "flow") 'words)

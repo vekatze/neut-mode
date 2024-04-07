@@ -73,7 +73,7 @@ Tips:
 
 (defun neut--goto-first-char-column ()
   "Go to the first non-space character of the current line."
-  (goto-char (line-beginning-position))
+  (beginning-of-line)
   (skip-chars-forward " ")
   (current-column))
 
@@ -179,7 +179,7 @@ Otherwise, return 0."
       0
     (save-excursion
       (goto-char point-or-none)
-      (goto-char (line-beginning-position))
+      (beginning-of-line)
       (skip-chars-forward " ")
       (if (re-search-forward "| " (+ (point) 2) t)
           (* -1 neut-mode-indent-offset)
@@ -318,7 +318,7 @@ This function must be called from outside a string."
 
 Intended to be used with `electric-indent-functions'."
   (save-excursion
-    (goto-char (line-beginning-position))
+    (beginning-of-line)
     (skip-chars-forward "[:space:]")
     (looking-at "in")))
 

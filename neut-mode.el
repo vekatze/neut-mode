@@ -63,7 +63,7 @@ Tips:
 
 (defun neut--goto-indent-base-position ()
   "Find a starting point to calculate the indentation of current line."
-  (goto-char (line-end-position))
+  (end-of-line)
   (goto-char (neut--find-shallowest-point 0 0 (point))))
 
 (defun neut--goto-line (line-number)

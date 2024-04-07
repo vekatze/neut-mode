@@ -378,7 +378,7 @@ Intended to be used with `electric-indent-functions'."
               . font-lock-type-face)
              (,(regexp-opt '("arrow" "attach" "bind" "case" "constant" "data" "default" "define" "detach" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "nominal" "of" "on" "resource" "tie" "try" "use" "when" "with") 'words)
               . font-lock-keyword-face)
-             (,(regexp-opt '("-" "->" "->>" ":" "=" "=>" "_") 'symbols)
+             (,(regexp-opt '("-" "->" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)
              (,(regexp-opt '("assert" "magic" "target-arch" "target-os" "target-platform") 'words)
               . font-lock-builtin-face)

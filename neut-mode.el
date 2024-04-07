@@ -4,6 +4,7 @@
 ;; Version: 1.0.0
 ;; Package-Requires: ((emacs "29"))
 ;; URL: https://github.com/vekatze/neut-mode
+;; SPDX-License-Identifier: MIT
 
 ;;; Commentary:
 

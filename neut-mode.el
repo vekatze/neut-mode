@@ -431,13 +431,19 @@ Intended to be used with `electric-indent-functions'."
 
 ;;;###autoload
 (when (require 'lsp-mode nil t)
+  (defvar lsp-language-id-configuration)
   (add-to-list 'lsp-language-id-configuration '(neut-mode . "neut"))
-  (lsp-register-client
-   (make-lsp-client :new-connection
-                    (lsp-stdio-connection
-                     (lambda() `("neut" "lsp" "--no-color")))
-                    :server-id 'lsp-neut
-                    :major-modes '(neut-mode))))
+  (add-to-list 'lsp-language-id-configuration '(neut-mode . "neut"))
+  (when (and
+         (fboundp 'lsp-register-client)
+         (fboundp 'make-lsp-client)
+         (fboundp 'lsp-stdio-connection))
+    (lsp-register-client
+     (make-lsp-client :new-connection
+                      (lsp-stdio-connection
+                       (lambda() `("neut" "lsp" "--no-color")))
+                      :server-id 'lsp-neut
+                      :major-modes '(neut-mode)))))
 
 ;;;###autoload
 (when (require 'eglot nil t)

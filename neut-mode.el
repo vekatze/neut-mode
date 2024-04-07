@@ -239,7 +239,7 @@ This function must be called from outside a string."
   "Read backward from `INITIAL-POSITION' and get a token."
   (let ((char (preceding-char)))
     (cond
-     ((eq (point) (line-beginning-position))
+     ((bolp)
       (buffer-substring-no-properties (point) initial-position))
      ((neut--non-token-p char)
       (buffer-substring-no-properties (point) initial-position))
@@ -334,7 +334,7 @@ Intended to be used with `electric-indent-functions'."
   "Insert '| '."
   (interactive)
   (cond
-   ((= (point) (line-beginning-position))
+   ((bolp)
     (insert "| "))
    ((not (neut--line-empty-p))
     (insert "|"))

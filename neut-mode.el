@@ -365,7 +365,7 @@ Intended to be used with `electric-indent-functions'."
      (modify-syntax-entry ?> "_" syntax-table)
      (modify-syntax-entry ?: "." syntax-table)
      (modify-syntax-entry ?+ "_" syntax-table)
-     (modify-syntax-entry ?? "_" syntax-table)
+     (modify-syntax-entry ?? "." syntax-table)
      (modify-syntax-entry ?* "." syntax-table)
      (modify-syntax-entry ?& "." syntax-table)
      syntax-table))
@@ -381,7 +381,7 @@ Intended to be used with `electric-indent-functions'."
               . font-lock-keyword-face)
              (,(regexp-opt '("-" "->" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)
-             (,(regexp-opt '("assert" "magic" "target-arch" "target-os" "target-platform") 'words)
+             (,(regexp-opt '("assert" "magic") 'words)
               . font-lock-builtin-face)
              (,(regexp-opt '("::") 'symbols)
               . font-lock-type-face)
@@ -389,10 +389,6 @@ Intended to be used with `electric-indent-functions'."
               . font-lock-warning-face)
              (,(regexp-opt '("this") 'words)
               . font-lock-constant-face)
-             ("\\_<_?\\.?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\_>"
-              . (1 font-lock-type-face))
-             ("\\_<_?\\.?\\(\[A-Z\]\[-A-Za-z0-9\]\*\\)\\."
-              . (1 font-lock-type-face))
              ("\\<define\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
              ("\\<inline\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
@@ -405,6 +401,12 @@ Intended to be used with `electric-indent-functions'."
               . (1 font-lock-constant-face))
              ("\\<nominal\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
+             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9\]\*\\)\\_>"
+              . (1 font-lock-type-face))
+             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9\]\*\\)\\."
+              . (1 font-lock-type-face))
+             ("\\_<\\.\\.\\.\\_>"
+              . font-lock-constant-face)
              ("*"
               . font-lock-builtin-face)
              ("+"
@@ -422,7 +424,7 @@ Intended to be used with `electric-indent-functions'."
              ("#"
               . font-lock-builtin-face)
              ("?"
-              . font-lock-type-face)
+              . font-lock-builtin-face)
              ("&"
               . font-lock-builtin-face)
              (":"

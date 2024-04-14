@@ -42,7 +42,7 @@ The indentation of a line can be calculated as follows:
 Tips:
 
   1. The indentation of the root encloser is (-1) * base-offset
-  2. Think of `let .. in' as a parenthesis pair like `(..)'"
+  2. Think of let .. in as a parenthesis pair like (..)"
   (if (or (neut--in-string-p (point))
           (neut--in-string-p (line-beginning-position)))
       (neut--get-indentation-of (point)) ;; leave strings as they are
@@ -98,14 +98,14 @@ Tips:
 (defun neut--find-shallowest-point (shallowness shallowest shallowest-pos)
   "Read backward from the eol to find (one of) the shallowest point of the line.
 
-The shallowness of a point is evaluated by `SHALLOWNESS'.  This value is
+The shallowness of a point is evaluated by SHALLOWNESS.  This value is
 incremented when an open paren is found, and decremented when a closing paren
 is found.
 
-The argument `SHALLOWEST' and `SHALLOWEST-POS' tracks the shallowest point
+The argument SHALLOWEST and SHALLOWEST-POS tracks the shallowest point
 so far.
 
-The `SHALLOWEST-POS' will be returned as the result of this function."
+The SHALLOWEST-POS will be returned as the result of this function."
   (let ((char (preceding-char)))
     (cond
      ((= char 0)
@@ -149,32 +149,32 @@ The `SHALLOWEST-POS' will be returned as the result of this function."
           (neut--find-shallowest-point shallowness shallowest shallowest-pos))))))))
 
 (defun neut--backtrack-opening-paren (shallowness shallowest shallowest-pos)
-  "After updating `SHALLOWEST' if necessary, continue reading backwards.
+  "After updating SHALLOWEST if necessary, continue reading backwards.
 
-The `SHALLOWEST' must be updated if current `SHALLOWNESS' is bigger than
-`SHALLOWEST'.  In such a case, `SHALLOWEST-POS' is also updated to the current
+The SHALLOWEST must be updated if current SHALLOWNESS is bigger than
+SHALLOWEST.  In such a case, SHALLOWEST-POS is also updated to the current
 position of the cursor.
 
 This function can be called only when the cursor is just before an opening
-parenthesis, like: `foo<CURSOR>(bar buz)'."
+parenthesis, like: foo<CURSOR>(bar buz)."
   (let ((next-shallowness (+ shallowness 1)))
     (if (> next-shallowness shallowest)
         (neut--find-shallowest-point next-shallowness next-shallowness (point))
       (neut--find-shallowest-point next-shallowness shallowest shallowest-pos))))
 
 (defun neut--backtrack-closing-paren (shallowness shallowest shallowest-pos)
-  "After updating `SHALLOWEST' if necessary, continue reading backwards.
+  "After updating SHALLOWEST if necessary, continue reading backwards.
 
-The `SHALLOWEST' must be updated if current SHALLOWNESS is bigger than
-`SHALLOWEST'.  In such a case, `SHALLOWEST-POS' is also updated to the current
+The SHALLOWEST must be updated if current SHALLOWNESS is bigger than
+SHALLOWEST.  In such a case, SHALLOWEST-POS is also updated to the current
 position of the cursor.
 
 This function can be called only when the cursor is just after an opening
-parenthesis, like: `foo(bar buz)<CURSOR>'."
+parenthesis, like: foo(bar buz)<CURSOR>."
   (neut--find-shallowest-point (- shallowness 1) shallowest shallowest-pos))
 
 (defun neut--get-bullet-offset (point-or-none)
-  "Return -2 if the line of `POINT-OR-NONE' begins from `- '.
+  "Return -2 if the line of POINT-OR-NONE begins from '| '.
 Otherwise, return 0."
   (if (not point-or-none)
       0
@@ -190,7 +190,7 @@ Otherwise, return 0."
   "Find the nearest encloser of current point by backtracking.
 Return nil if the encloser is the file itself.
 
-The `NEST-LEVEL' tracks the nest level of `let .. in'.
+The NEST-LEVEL tracks the nest level of let .. in.
 This function must be called from outside a string."
   (let ((char (preceding-char)))
     (cond
@@ -237,7 +237,7 @@ This function must be called from outside a string."
           (neut--get-parent nest-level))))))))
 
 (defun neut--get-token (initial-position)
-  "Read backward from `INITIAL-POSITION' and get a token."
+  "Read backward from INITIAL-POSITION and get a token."
   (let ((char (preceding-char)))
     (cond
      ((bolp)
@@ -249,12 +249,12 @@ This function must be called from outside a string."
       (neut--get-token initial-position)))))
 
 (defun neut--closing-angle-p ()
-  "Return non-nil iff the character on the cursor is `>'."
+  "Return non-nil iff the character on the cursor is >."
   (let ((char (preceding-char)))
     (equal char ?>)))
 
 (defun neut--genuine-closing-angle-p ()
-  "Return non-nil iff the cursor is on `>', and not on `->' or `=>'."
+  "Return non-nil iff the cursor is on >, and not on -> or =>."
   (let ((char (preceding-char))
         (str (buffer-substring-no-properties (- (point) 2) (point))))
     (and (equal char ?>)
@@ -262,12 +262,12 @@ This function must be called from outside a string."
          (not (equal str "=>")))))
 
 (defun neut--opening-angle-p ()
-  "Return non-nil iff the character on the cursor is `<'."
+  "Return non-nil iff the character on the cursor is <."
   (let ((char (preceding-char)))
     (equal char ?<)))
 
 (defun neut--make-hash-table (chars)
-  "Create a new hash table using a list of characters `CHARS'."
+  "Create a new hash table using a list of characters CHARS."
   (let ((table (make-hash-table :test #'equal)))
     (dolist (char chars)
       (puthash char t table))
@@ -290,28 +290,28 @@ This function must be called from outside a string."
 (defconst neut--closing-token-set
   (neut--make-hash-table (list "in" ">")))
 (defun neut--opening-paren-p (char)
-  "Return non-nil iff `CHAR' is an opening paren."
+  "Return non-nil iff CHAR is an opening paren."
   (gethash char neut--opening-paren-char-set))
 (defun neut--closing-paren-p (char)
-  "Return non-nil iff `CHAR' is a closing paren."
+  "Return non-nil iff CHAR is a closing paren."
   (gethash char neut--closing-paren-char-set))
 (defun neut--skip-p (char)
-  "Return non-nil iff `CHAR' must be skipped during backtracking."
+  "Return non-nil iff CHAR must be skipped during backtracking."
   (gethash char neut--skip-char-set))
 (defun neut--newline-p (char)
-  "Return non-nil iff `CHAR' is a newline."
+  "Return non-nil iff CHAR is a newline."
   (gethash char neut--newline-char-set))
 (defun neut--double-quote-p (char)
-  "Return non-nil iff `CHAR' is a double quote."
+  "Return non-nil iff CHAR is a double quote."
   (gethash char neut--double-quote-char-set))
 (defun neut--non-token-p (char)
-  "Return non-nil iff `CHAR' is a non-token character."
+  "Return non-nil iff CHAR is a non-token character."
   (gethash char neut--non-token-char-set))
 (defun neut--open-token-p (char)
-  "Return non-nil iff `CHAR' is an opening token."
+  "Return non-nil iff CHAR is an opening token."
   (gethash char neut--opening-token-set))
 (defun neut--close-token-p (char)
-  "Return non-nil iff `CHAR' is a closing token."
+  "Return non-nil iff CHAR is a closing token."
   (gethash char neut--closing-token-set))
 
 (defun neut--electric-indent-p (_)

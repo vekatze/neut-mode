@@ -1,3 +1,5 @@
+[![MELPA](https://melpa.org/packages/neut-mode-badge.svg)](https://melpa.org/#/neut-mode)
+
 # neut-mode
 
 `neut-mode` is a major mode for the [Neut](https://vekatze.github.io/neut) programming language.

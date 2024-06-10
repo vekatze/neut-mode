@@ -368,6 +368,7 @@ Intended to be used with `electric-indent-functions'."
      (modify-syntax-entry ?? "." syntax-table)
      (modify-syntax-entry ?* "." syntax-table)
      (modify-syntax-entry ?& "." syntax-table)
+     (modify-syntax-entry ?` "\"" syntax-table)
      syntax-table))
   (setq-local indent-line-function #'neut-mode-indent-line)
   (setq-local xref-prompt-for-identifier nil)
@@ -375,13 +376,13 @@ Intended to be used with `electric-indent-functions'."
   (define-key neut-mode-map "|" #'neut--insert-bar)
   (setq font-lock-defaults
         `(,`(("^=.*" . font-lock-doc-face)
-             (,(regexp-opt '("tau" "flow") 'words)
+             (,(regexp-opt '("thread" "type") 'words)
               . font-lock-type-face)
-             (,(regexp-opt '("arrow" "attach" "bind" "case" "constant" "data" "default" "define" "detach" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "nominal" "of" "on" "resource" "tie" "try" "use" "when" "with") 'words)
+             (,(regexp-opt '("arrow" "attach" "bind" "case" "constant" "data" "default" "define" "detach" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "lambda" "let" "match" "nominal" "of" "on" "pin" "resource" "tie" "try" "use" "when" "with") 'words)
               . font-lock-keyword-face)
              (,(regexp-opt '("-" "->" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)
-             (,(regexp-opt '("assert" "magic") 'words)
+             (,(regexp-opt '("assert" "magic" "include-text" "asset" "static") 'words)
               . font-lock-builtin-face)
              (,(regexp-opt '("::") 'symbols)
               . font-lock-type-face)
@@ -401,9 +402,9 @@ Intended to be used with `electric-indent-functions'."
               . (1 font-lock-constant-face))
              ("\\<nominal\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
               . (1 font-lock-function-name-face))
-             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9\]\*\\)\\_>"
+             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9_\]\*\\)\\_>"
               . (1 font-lock-type-face))
-             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9\]\*\\)\\."
+             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9_\]\*\\)\\."
               . (1 font-lock-type-face))
              ("\\_<\\.\\.\\.\\_>"
               . font-lock-constant-face)
@@ -420,8 +421,6 @@ Intended to be used with `electric-indent-functions'."
              (","
               . font-lock-builtin-face)
              (";"
-              . font-lock-builtin-face)
-             ("#"
               . font-lock-builtin-face)
              ("?"
               . font-lock-builtin-face)
@@ -449,9 +448,10 @@ Intended to be used with `electric-indent-functions'."
                       :major-modes '(neut-mode)))))
 
 ;;;###autoload
-(when (require 'eglot nil t)
-  (setq-local eglot-server-programs
-              `((neut-mode . ("neut" "lsp" "--no-color")))))
+(when (featurep 'eglot)
+  (defvar eglot-server-programs)
+  (add-to-list 'eglot-server-programs
+               '(neut-mode . ("neut" "lsp" "--no-color"))))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.nt\\'" 'neut-mode))

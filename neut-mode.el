@@ -382,7 +382,7 @@ Intended to be used with `electric-indent-functions'."
               . font-lock-keyword-face)
              (,(regexp-opt '("->" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)
-             (,(regexp-opt '("assert" "magic" "include-text" "asset" "static") 'symbols)
+             (,(regexp-opt '("assert" "magic" "include-text" "static") 'symbols)
               . font-lock-builtin-face)
              (,(regexp-opt '("::") 'symbols)
               . font-lock-type-face)

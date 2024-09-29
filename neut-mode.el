@@ -443,7 +443,7 @@ Intended to be used with `electric-indent-functions'."
     (lsp-register-client
      (make-lsp-client :new-connection
                       (lsp-stdio-connection
-                       (lambda() `("neut" "lsp" "--no-color")))
+                       (lambda() `("neut" "lsp")))
                       :server-id 'lsp-neut
                       :major-modes '(neut-mode)))))
 
@@ -451,7 +451,7 @@ Intended to be used with `electric-indent-functions'."
 (when (featurep 'eglot)
   (defvar eglot-server-programs)
   (add-to-list 'eglot-server-programs
-               '(neut-mode . ("neut" "lsp" "--no-color"))))
+               '(neut-mode . ("neut" "lsp"))))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.nt\\'" 'neut-mode))

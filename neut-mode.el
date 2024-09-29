@@ -380,7 +380,7 @@ Intended to be used with `electric-indent-functions'."
               . font-lock-type-face)
              (,(regexp-opt '("attach" "bind" "box" "case" "catch" "constant" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "let" "letbox" "letbox-T" "match" "nominal" "of" "on" "pin" "quote" "resource" "tie" "try" "use" "when" "with") 'symbols)
               . font-lock-keyword-face)
-             (,(regexp-opt '("-" "->" ":" "=" "=>" "_") 'symbols)
+             (,(regexp-opt '("->" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)
              (,(regexp-opt '("assert" "magic" "include-text" "asset" "static") 'symbols)
               . font-lock-builtin-face)

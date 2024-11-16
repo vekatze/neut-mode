@@ -376,9 +376,9 @@ Intended to be used with `electric-indent-functions'."
   (define-key neut-mode-map "|" #'neut--insert-bar)
   (setq font-lock-defaults
         `(,`(("^=.*" . font-lock-doc-face)
-             (,(regexp-opt '("thread" "type" "meta" "rune") 'symbols)
+             (,(regexp-opt '("thread" "type" "meta" "rune" "pointer") 'symbols)
               . font-lock-type-face)
-             (,(regexp-opt '("attach" "bind" "box" "case" "catch" "constant" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "let" "letbox" "letbox-T" "match" "nominal" "of" "on" "pin" "quote" "resource" "tie" "try" "use" "when" "with") 'symbols)
+             (,(regexp-opt '("attach" "bind" "box" "case" "catch" "constant" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "let" "letbox" "letbox-T" "let-function" "match" "nominal" "of" "on" "pin" "quote" "resource" "tie" "try" "use" "when" "with") 'symbols)
               . font-lock-keyword-face)
              (,(regexp-opt '("->" ":" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)

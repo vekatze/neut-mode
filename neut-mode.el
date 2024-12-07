@@ -286,7 +286,7 @@ This function must be called from outside a string."
 (defconst neut--non-token-char-set
   (neut--make-hash-table (list ?{ ?} ?\( ?\) ?\[ ?\] ?< ?> ?\s ?\n ?\;)))
 (defconst neut--opening-token-set
-  (neut--make-hash-table (list "cotry" "let" "tie" "try" "bind" "pin" "use" "<" "letbox" "letbox-T")))
+  (neut--make-hash-table (list "<" "bind" "let" "letbox" "letbox-T" "pin" "tie" "try" "use")))
 (defconst neut--closing-token-set
   (neut--make-hash-table (list "in" ">")))
 (defun neut--opening-paren-p (char)
@@ -376,9 +376,9 @@ Intended to be used with `electric-indent-functions'."
   (define-key neut-mode-map "|" #'neut--insert-bar)
   (setq font-lock-defaults
         `(,`(("^=.*" . font-lock-doc-face)
-             (,(regexp-opt '("thread" "type" "meta" "rune" "pointer" "void") 'symbols)
+             (,(regexp-opt '("meta" "pointer" "rune" "thread" "type" "void") 'symbols)
               . font-lock-type-face)
-             (,(regexp-opt '("attach" "bind" "box" "case" "catch" "constant" "cotry" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "let" "letbox" "letbox-T" "let-function" "match" "nominal" "of" "on" "pin" "quote" "resource" "tie" "try" "use" "when" "with") 'symbols)
+             (,(regexp-opt '("attach" "bind" "box" "case" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "in" "inline" "introspect" "let" "letbox" "letbox-T" "match" "nominal" "of" "on" "pin" "quote" "resource" "tie" "try" "use" "when" "with") 'symbols)
               . font-lock-keyword-face)
              (,(regexp-opt '("->" "=" "=>" "_") 'symbols)
               . font-lock-builtin-face)

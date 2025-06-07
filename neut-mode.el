@@ -12,60 +12,70 @@
 
 ;;; Code:
 
-;; indentation
+;;;; Customisation group
 
-(defvar neut-mode-indent-offset 2
-  "Indentation offset for `neut-mode'.")
+(defgroup neut nil
+  "Major mode for editing Neut source files."
+  :group 'languages)
 
-(defconst neut--open-parens
-  '(?\( ?\{ ?\[))
+;;;; Delimiter tables
 
-(defconst neut--close-parens
-  '(?\) ?\} ?\]))
+(defconst neut-indent-offset 2
+  "Basic indentation step for `neut-mode'.")
+
+(defconst neut--open-parens '(?\( ?\{ ?\[)
+  "Opening parenthesis characters recognised by Neut.")
+
+(defconst neut--close-parens '(?\) ?\} ?\])
+  "Closing parenthesis characters recognised by Neut.")
 
 (defconst neut--opening-delims
-  `(,@neut--open-parens ?= ?<))
+  `(,@neut--open-parens ?= ?<)
+  "All opening delimiters, including Neut specific tokens ‘=’ and ‘<’.")
 
 (defconst neut--closing-delims
-  `(,@neut--close-parens ?\; ?>))
+  `(,@neut--close-parens ?\; ?>)
+  "All closing delimiters, including Neut specific tokens ‘;’ and ‘>’.")
+
+;;;; Internal helpers: syntax & text properties
 
 (defun neut--in-string-or-comment-p (pos)
-  "Return non-nil if POS is in a string or comment."
+  "Return non-nil if POS lies inside a string or comment."
   (let ((ppss (syntax-ppss pos)))
     (or (nth 3 ppss) (nth 4 ppss))))
 
-(defun neut--arrow-p (pos)
-  "Return non-nil if character before POS is = or - (i.e., part of => or ->)."
-  (and
-   (eq (char-after pos) ?>)
-   (memq (char-after (1- pos)) '(?= ?-))))
+(defun neut--arrow-start-p (pos)
+  "Return non-nil if the two characters ending at POS form “->” or “=>”."
+  (and (eq (char-after pos) ?>)
+       (memq (char-after (1- pos)) '(?= ?-))))
 
-(defun neut--colon-equal-p (pos)
-  "Return non-nil if character before POS is :=."
-  (and
-   (eq (char-after pos) ?=)
-   (eq (char-after (1- pos)) ?:)))
+(defun neut--colon-equal-start-p (pos)
+  "Return non-nil if the two characters ending at POS form “:=”."
+  (and (eq (char-after pos) ?=)
+       (eq (char-after (1- pos)) ?:)))
 
-(defun neut--offset-from-eol ()
-  "Return the number of characters between point and end of line."
+(defun neut--line-offset-from-eol ()
+  "Return number of characters between point and end-of-line."
   (- (line-end-position) (point)))
 
-(defun neut--get-indentation-of (pos)
-  "Return indentation of the line containing POS, or negative offset if nil."
+(defun neut--indent-of-line (pos)
+  "Indentation of the line containing POS, or −`neut-indent-offset' if POS is nil."
   (if pos
       (save-excursion
         (goto-char pos)
-        (current-indentation))
-    (* -1 neut-mode-indent-offset)))
+        (goto-char (line-beginning-position))
+        (skip-chars-forward " |")
+        (current-column))
+    (- neut-indent-offset)))
 
-(defun neut--should-dedent-p (pt)
-  "Return non-nil if the line at PT starts with a closing delimiter."
+(defun neut--line-starts-with-closing-delim-p (pos)
+  "Return non-nil if the line at POS begins with a closing delimiter token."
   (save-excursion
-    (goto-char pt)
-    (skip-chars-forward " ")
+    (goto-char pos)
+    (skip-chars-forward " \t")
     (memq (char-after) '(?\) ?\] ?\} ?> ?|))))
 
-(defun neut--match-delim-p (open close)
+(defun neut--matching-delims-p (open close)
   "Return non-nil if OPEN and CLOSE form a matching delimiter pair."
   (pcase (cons open close)
     (`(?\( . ?\)) t)
@@ -75,92 +85,88 @@
     (`(?<  . ?>)  t)
     (_ nil)))
 
-(defun neut--skip-comment (point)
-  "Return the buffer position of the leftmost '//' on the current line, or nil
-if not found."
+(defun neut--comment-start-on-line (pos)
+  "Return buffer position of “//” comment on current line, or nil if none."
   (save-excursion
-    (goto-char point)
+    (goto-char pos)
     (goto-char (line-beginning-position))
-    (let ((line-end (line-end-position)))
-      (if (search-forward "//" line-end t)
-            (match-beginning 0)
-        point))))
+    (let ((limit (line-end-position)))
+      (when (search-forward "//" limit t)
+        (match-beginning 0)))))
 
-(defun neut--find-innermost-enclosing-paren (cursor)
-  "Find the position of the innermost opening delimiter enclosing CURSOR.
-Skips delimiters inside strings/comments and handles ( { [ = < … ) } ] ; >."
+;;;; Delimiter search (indent engine core)
+
+(defun neut--innermost-opening-delim (cursor)
+  "Return position of innermost opening delimiter enclosing CURSOR.
+Skip delimiters inside strings, comments and multi-char tokens like \"->\"."
   (let ((pos cursor)
         (limit (point-min))
         (stack '())
-        (result nil))
+        result)
     (while (and (not result) (> pos limit))
       (setq pos (1- pos))
       (let ((ch (char-after pos)))
         (cond
+         ;; Handle comments
          ((eq ch ?\n)
-          (setq pos (neut--skip-comment pos)))
+          (setq pos (or (neut--comment-start-on-line pos) pos)))
+         ;; Handle strings
          ((eq ch ?\")
-          (let ((open (scan-sexps (1+ pos) -1)))
-            (setq pos open)))
-         ((memq ch neut--close-parens)
-          (let ((open (ignore-errors (scan-sexps (1+ pos) -1))))
-            (if (not open)
-                (push ch stack)
-              (push ch stack)
-              (setq pos (1+ open)))))
-         ;; skip "->" and "=>"
-         ((neut--arrow-p pos)
+          (setq pos (or (scan-sexps (1+ pos) -1) pos)))
+         ;; Skip arrows
+         ((neut--arrow-start-p pos)
           (setq pos (1- pos)))
-         ;; skip ":="
-         ((neut--colon-equal-p pos)
+         ;; Skip ":="
+         ((neut--colon-equal-start-p pos)
           (setq pos (1- pos)))
+         ;; Closing delimiters
          ((memq ch neut--closing-delims)
           (push ch stack))
+         ;; Opening delimiters
          ((memq ch neut--opening-delims)
+          ;; Collapse ; stack frames until a matching opener for = is found
           (while (and stack (eq (car stack) ?\;) (not (eq ch ?=)))
             (pop stack))
-          (if (and stack (neut--match-delim-p ch (car stack)))
+          (if (and stack (neut--matching-delims-p ch (car stack)))
               (pop stack)
             (setq result pos))))))
     result))
 
-(defun neut--calculate-indentation ()
-  "Return the desired indentation for the current line."
+;;;; Indentation calculation
+
+(defun neut--desired-indentation ()
+  "Compute desired indentation for current line."
   (if (neut--in-string-or-comment-p (line-beginning-position))
-      (neut--get-indentation-of (point))
-    (let* ((parent-pos (save-excursion
-                         (neut--find-innermost-enclosing-paren (line-beginning-position))))
-           (parent-indent (neut--get-indentation-of parent-pos)))
-      (if (neut--should-dedent-p (point))
-          parent-indent
-        (+ parent-indent neut-mode-indent-offset)))))
+      (neut--indent-of-line (point))
+    (let* ((parent-pos (neut--innermost-opening-delim (line-beginning-position)))
+           (base-ind (neut--indent-of-line parent-pos)))
+      (if (neut--line-starts-with-closing-delim-p (point))
+          base-ind
+        (+ base-ind neut-indent-offset)))))
 
-(defun neut-mode-indent-line ()
-  "Indent the current line appropriately for `neut-mode'."
+(defun neut-indent-line ()
+  "Indent current line according to Neut rules."
   (interactive)
-  (let ((original-offset (neut--offset-from-eol)))
-    (indent-line-to (neut--calculate-indentation))
-    ;; Preserve relative cursor position from end of line
-    (when (< original-offset (neut--offset-from-eol))
-      (goto-char (- (line-end-position) original-offset)))))
+  (let ((orig-eol-offset (neut--line-offset-from-eol)))
+    (indent-line-to (neut--desired-indentation))
+    ;; Restore cursor’s relative EOL position
+    (when (< orig-eol-offset (neut--line-offset-from-eol))
+      (goto-char (- (line-end-position) orig-eol-offset)))))
 
-(defun neut--electric-indent-p (_)
-  "Return non-nil if the current line should be indented now.
+;;;; Minor editing helpers
 
-Intended to be used with `electric-indent-functions'."
+(defun neut--electric-indent-p (_char)
+  "Function for `electric-indent-functions'—indent when line begins with “in”."
   (save-excursion
-    (beginning-of-line)
-    (skip-chars-forward "[:space:]")
-    (looking-at "in")))
-
-;; utils
+    (back-to-indentation)
+    (looking-at-p "in\\_>")))
 
 (defun neut--line-empty-p ()
-  "Return non-nil if the current line is empty."
+  "Return non-nil when current line contains only whitespace."
   (string-match-p "\\`\\s-*$" (thing-at-point 'line)))
 
-(defun neut--insert-bar ()
-  "Insert '| '."
+(defun neut-insert-bar ()
+  "Smart insertion of “|” respecting Neut layout rules."
   (interactive)
   (cond
    ((bolp)
@@ -171,112 +177,78 @@ Intended to be used with `electric-indent-functions'."
     (insert "| ")
     (indent-according-to-mode))))
 
-;; main
+;;;; Font-lock
+
+(defconst neut--font-lock-keywords
+  (let* ((types    '("meta" "pointer" "rune" "thread" "type" "void"))
+         (keywords '("attach" "bind" "box" "case" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "inline" "introspect" "let" "letbox" "letbox-T" "match" "nominal" "of" "on" "pin" "quote" "resource" "tie" "try" "use" "when" "with"))
+         (builtins '("->" "=" "=>" "_" "assert" "magic" "include-text" "static"))
+         (warnings '("admit"))
+         (constants '("this"))
+         (regexp-sym (lambda (syms) (regexp-opt syms 'symbols))))
+    `((,(rx line-start "=" (* nonl))   . font-lock-doc-face)
+      (,(funcall regexp-sym types)     . font-lock-type-face)
+      (,(funcall regexp-sym keywords)  . font-lock-keyword-face)
+      (,(funcall regexp-sym builtins)  . font-lock-builtin-face)
+      (,(funcall regexp-sym warnings)  . font-lock-warning-face)
+      (,(funcall regexp-sym constants) . font-lock-constant-face)
+      ("\\_<\\(?:define\\|inline\\|function\\|resource\\)\\_>[[:space:]]+\\([^[:space:]\n({<\\[)}>\n]+\\)"
+       (1 font-lock-function-name-face))
+      ("\\_<data\\_>[[:space:]]+\\([^[:space:]\n()]+\\)"
+       (1 font-lock-function-name-face))
+      ("\\_<\\(?:_?\\.?[A-Z][-A-Za-z0-9_]*\\)\\_>"
+       . font-lock-type-face)
+      (,(rx (any "*+\\|!,&:@?,;"))
+       . font-lock-builtin-face)))
+  "Default highlighting expressions for `neut-mode'.")
+
+;;;; Major mode definition
 
 ;;;###autoload
-(define-derived-mode neut-mode prog-mode "neut"
-  "A major mode for Neut."
+(define-derived-mode neut-mode prog-mode "Neut"
+  "Major mode for editing Neut source code."
   (setq-local comment-start "//")
   (setq-local comment-end "")
-  (set (make-local-variable 'comment-padding) 1)
-  (set (make-local-variable 'comment-use-syntax) t)
+  (setq-local comment-padding 1)
+  (setq-local comment-use-syntax t)
   (set-syntax-table
-   (let ((syntax-table (make-syntax-table)))
-     (modify-syntax-entry ?/ ". 12" syntax-table)
-     (modify-syntax-entry ?\n ">" syntax-table)
-     (modify-syntax-entry ?- "_" syntax-table)
-     (modify-syntax-entry ?_ "_" syntax-table)
-     (modify-syntax-entry ?. "_" syntax-table)
-     (modify-syntax-entry ?< "_" syntax-table)
-     (modify-syntax-entry ?> "_" syntax-table)
-     (modify-syntax-entry ?: "." syntax-table)
-     (modify-syntax-entry ?+ "_" syntax-table)
-     (modify-syntax-entry ?? "." syntax-table)
-     (modify-syntax-entry ?* "." syntax-table)
-     (modify-syntax-entry ?& "." syntax-table)
-     (modify-syntax-entry ?` "\"" syntax-table)
-     syntax-table))
-  (setq-local indent-line-function #'neut-mode-indent-line)
-  (setq-local xref-prompt-for-identifier nil)
-  (add-hook 'electric-indent-functions #'neut--electric-indent-p nil 'local)
-  (define-key neut-mode-map "|" #'neut--insert-bar)
-  (setq font-lock-defaults
-        `(,`(("^=.*" . font-lock-doc-face)
-             (,(regexp-opt '("meta" "pointer" "rune" "thread" "type" "void") 'symbols)
-              . font-lock-type-face)
-             (,(regexp-opt '("attach" "bind" "box" "case" "data" "default" "define" "detach" "do" "else" "else-if" "exact" "external" "foreign" "function" "if" "import" "inline" "introspect" "let" "letbox" "letbox-T" "match" "nominal" "of" "on" "pin" "quote" "resource" "tie" "try" "use" "when" "with") 'symbols)
-              . font-lock-keyword-face)
-             (,(regexp-opt '("->" "=" "=>" "_") 'symbols)
-              . font-lock-builtin-face)
-             (,(regexp-opt '("assert" "magic" "include-text" "static") 'symbols)
-              . font-lock-builtin-face)
-             (,(regexp-opt '("admit") 'symbols)
-              . font-lock-warning-face)
-             (,(regexp-opt '("this") 'symbols)
-              . font-lock-constant-face)
-             ("\\<define\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("\\<inline\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("\\<function\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ :\n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("\\<data\\> +\\([^[:space:]\s(\s)]+?\\)[ \n\s(\s)]"
-              . (1 font-lock-function-name-face))
-             ("\\<resource\\> +\\([^[:space:]\s({<\s)}>]+?\\)[ \n\s{(<\\[\s)}>]"
-              . (1 font-lock-function-name-face))
-             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9_\]\*\\)\\_>"
-              . (1 font-lock-type-face))
-             ("\\_<\\(_?\\.?\[A-Z\]\[-A-Za-z0-9_\]\*\\)\\."
-              . (1 font-lock-type-face))
-             ("\\_<\\.\\.\\.\\_>"
-              . font-lock-constant-face)
-             ("*"
-              . font-lock-builtin-face)
-             ("+"
-              . font-lock-builtin-face)
-             ("\\\\"
-              . font-lock-builtin-face)
-             ("|"
-              . font-lock-builtin-face)
-             ("!"
-              . font-lock-builtin-face)
-             (","
-              . font-lock-builtin-face)
-             (";"
-              . font-lock-builtin-face)
-             ("?"
-              . font-lock-builtin-face)
-             ("&"
-              . font-lock-builtin-face)
-             (":"
-              . font-lock-builtin-face)
-             ("@"
-              . font-lock-builtin-face)))))
+   (let ((st (make-syntax-table)))
+     (modify-syntax-entry ?/ ". 12" st)
+     (modify-syntax-entry ?\n ">" st)
+     (dolist (ch (string-to-list "-_.<>+*?&"))
+       (modify-syntax-entry ch "_" st))
+     (modify-syntax-entry ?` "\"" st)
+     st))
+  (setq-local indent-line-function #'neut-indent-line)
+  (add-hook 'electric-indent-functions #'neut--electric-indent-p nil t)
+  (setq-local font-lock-defaults '(neut--font-lock-keywords))
+  (define-key neut-mode-map "|" #'neut-insert-bar)
+  (setq-local xref-prompt-for-identifier nil))
+
+;;;; LSP / Eglot integration
 
 ;;;###autoload
-(when (require 'lsp-mode nil t)
+(with-eval-after-load 'lsp-mode
   (defvar lsp-language-id-configuration)
   (add-to-list 'lsp-language-id-configuration '(neut-mode . "neut"))
-  (add-to-list 'lsp-language-id-configuration '(neut-mode . "neut"))
-  (when (and
-         (fboundp 'lsp-register-client)
-         (fboundp 'make-lsp-client)
-         (fboundp 'lsp-stdio-connection))
+  (when (and (fboundp 'lsp-register-client)
+             (fboundp 'make-lsp-client)
+             (fboundp 'lsp-stdio-connection))
     (lsp-register-client
-     (make-lsp-client :new-connection
-                      (lsp-stdio-connection
-                       (lambda() `("neut" "lsp")))
-                      :server-id 'lsp-neut
-                      :major-modes '(neut-mode)))))
+     (make-lsp-client
+      :new-connection (lsp-stdio-connection (lambda () '("neut" "lsp")))
+      :server-id 'lsp-neut
+      :major-modes '(neut-mode)))))
 
 ;;;###autoload
-(when (featurep 'eglot)
+(with-eval-after-load 'eglot
   (defvar eglot-server-programs)
-  (add-to-list 'eglot-server-programs
-               '(neut-mode . ("neut" "lsp"))))
+  (add-to-list 'eglot-server-programs '(neut-mode . ("neut" "lsp"))))
+
+;;;; File associations -------------------------------------------------------
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist (cons "\\.nt\\'" 'neut-mode))
+(add-to-list 'auto-mode-alist '("\\.nt\\'" . neut-mode))
 
 (provide 'neut-mode)
 
